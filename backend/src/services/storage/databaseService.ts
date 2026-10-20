@@ -84,9 +84,11 @@ export class DatabaseService {
           userId TEXT,
           exchangeName TEXT,
           apiKeyIv TEXT,
-          apiKeyContent TEXT,
+          apiKeyEncryptedText TEXT,
+          apiKeyTag TEXT,
           apiSecretIv TEXT,
-          apiSecretContent TEXT,
+          apiSecretEncryptedText TEXT,
+          apiSecretTag TEXT,
           updatedAt INTEGER,
           PRIMARY KEY (userId, exchangeName)
         );
@@ -150,13 +152,13 @@ export class DatabaseService {
   // Exchange Keys
   async saveExchangeKeys(userId: string, exchangeName: string, apiKeyEncrypted: EncryptedData, apiSecretEncrypted: EncryptedData): Promise<void> {
     await this.db?.run(
-      `INSERT INTO exchange_keys (userId, exchangeName, apiKeyIv, apiKeyContent, apiSecretIv, apiSecretContent, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO exchange_keys (userId, exchangeName, apiKeyIv, apiKeyEncryptedText, apiKeyTag, apiSecretIv, apiSecretEncryptedText, apiSecretTag, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(userId, exchangeName) DO UPDATE SET
-       apiKeyIv=excluded.apiKeyIv, apiKeyContent=excluded.apiKeyContent,
-       apiSecretIv=excluded.apiSecretIv, apiSecretContent=excluded.apiSecretContent,
+       apiKeyIv=excluded.apiKeyIv, apiKeyEncryptedText=excluded.apiKeyEncryptedText, apiKeyTag=excluded.apiKeyTag,
+       apiSecretIv=excluded.apiSecretIv, apiSecretEncryptedText=excluded.apiSecretEncryptedText, apiSecretTag=excluded.apiSecretTag,
        updatedAt=excluded.updatedAt`,
-      [userId, exchangeName, apiKeyEncrypted.iv, apiKeyEncrypted.content, apiSecretEncrypted.iv, apiSecretEncrypted.content, Date.now()]
+      [userId, exchangeName, apiKeyEncrypted.iv, apiKeyEncrypted.encryptedText, apiKeyEncrypted.tag, apiSecretEncrypted.iv, apiSecretEncrypted.encryptedText, apiSecretEncrypted.tag, Date.now()]
     );
   }
 
@@ -166,8 +168,8 @@ export class DatabaseService {
     return {
       userId: row.userId,
       exchangeName: row.exchangeName,
-      apiKeyEncrypted: { iv: row.apiKeyIv, content: row.apiKeyContent },
-      apiSecretEncrypted: { iv: row.apiSecretIv, content: row.apiSecretContent },
+      apiKeyEncrypted: { iv: row.apiKeyIv, encryptedText: row.apiKeyEncryptedText, tag: row.apiKeyTag },
+      apiSecretEncrypted: { iv: row.apiSecretIv, encryptedText: row.apiSecretEncryptedText, tag: row.apiSecretTag },
       updatedAt: row.updatedAt
     };
   }
@@ -177,8 +179,8 @@ export class DatabaseService {
     return (rows || []).map(row => ({
       userId: row.userId,
       exchangeName: row.exchangeName,
-      apiKeyEncrypted: { iv: row.apiKeyIv, content: row.apiKeyContent },
-      apiSecretEncrypted: { iv: row.apiSecretIv, content: row.apiSecretContent },
+      apiKeyEncrypted: { iv: row.apiKeyIv, encryptedText: row.apiKeyEncryptedText, tag: row.apiKeyTag },
+      apiSecretEncrypted: { iv: row.apiSecretIv, encryptedText: row.apiSecretEncryptedText, tag: row.apiSecretTag },
       updatedAt: row.updatedAt
     }));
   }

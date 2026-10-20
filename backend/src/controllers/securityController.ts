@@ -11,7 +11,7 @@ export class SecurityController {
       const { active } = req.body;
       const isKillSwitchActive = Boolean(active);
 
-      db.setKillSwitch(userId, isKillSwitchActive);
+      await db.setKillSwitch(userId, isKillSwitchActive);
 
       res.json({
         success: true,
@@ -28,7 +28,7 @@ export class SecurityController {
   static async getKillSwitchStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const isKillSwitchActive = db.isKillSwitchActive(userId);
+      const isKillSwitchActive = await db.isKillSwitchActive(userId);
 
       res.json({
         success: true,
@@ -40,7 +40,7 @@ export class SecurityController {
     }
   }
 
-  static isKillSwitchOn(userId: string): boolean {
-    return db.isKillSwitchActive(userId);
+  static async isKillSwitchOn(userId: string): Promise<boolean> {
+    return await db.isKillSwitchActive(userId);
   }
 }

@@ -49,7 +49,7 @@ export class ExchangeController {
       const encryptedKey = CryptoService.encrypt(apiKey.trim());
       const encryptedSecret = CryptoService.encrypt(apiSecret.trim());
 
-      db.saveExchangeKeys(userId, selectedExchange, encryptedKey, encryptedSecret);
+      await db.saveExchangeKeys(userId, selectedExchange, encryptedKey, encryptedSecret);
 
       res.json({
         success: true,
@@ -64,7 +64,7 @@ export class ExchangeController {
   static async getBalance(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const userKeyInfo = db.getExchangeKeys(userId);
+      const userKeyInfo = await db.getExchangeKeys(userId, 'binance');
 
       if (!userKeyInfo) {
         res.status(400).json({
@@ -94,7 +94,7 @@ export class ExchangeController {
   static async getStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const userKeyInfo = db.getExchangeKeys(userId);
+      const userKeyInfo = await db.getExchangeKeys(userId, 'binance');
 
       if (!userKeyInfo) {
         res.json({

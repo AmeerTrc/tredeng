@@ -27,14 +27,14 @@ export class AuthController {
         return;
       }
 
-      const existingUser = db.getUserByEmail(email);
+      const existingUser = await db.getUserByEmail(email);
       if (existingUser) {
         res.status(400).json({ success: false, data: null, message: 'البريد الإلكتروني مستخدم بالفعل' });
         return;
       }
 
       const hashed = await bcrypt.hash(password, 10);
-      const user = db.createUser(email, hashed);
+      const user = await db.createUser(email, hashed);
 
       const token = jwt.sign({ userId: user.id, email: user.email }, ENV.JWT_SECRET, { expiresIn: '7d' });
 
@@ -63,7 +63,7 @@ export class AuthController {
         return;
       }
 
-      const user = db.getUserByEmail(email);
+      const user = await db.getUserByEmail(email);
       if (!user) {
         res.status(401).json({ success: false, data: null, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
         return;
