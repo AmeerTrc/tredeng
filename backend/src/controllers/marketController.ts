@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { BinanceAdapter } from '../services/exchange/binanceAdapter';
 import { ExnessAdapter } from '../services/exchange/exnessAdapter';
+import { OkxAdapter } from '../services/exchange/okxAdapter';
+import { BybitAdapter } from '../services/exchange/bybitAdapter';
 import { DatabaseService } from '../services/storage/databaseService';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
@@ -11,7 +13,13 @@ export class MarketController {
     try {
       const rawSymbol = Array.isArray(req.params.symbol) ? req.params.symbol[0] : req.params.symbol;
       const symbol = (rawSymbol || 'BTCUSDT').toUpperCase();
-      const adapter = symbol.includes('XAU') ? new ExnessAdapter() : new BinanceAdapter();
+
+      const exchangeQuery = (req.query.exchange as string || 'binance').toLowerCase();
+      let adapter: any = new BinanceAdapter();
+      if (exchangeQuery === 'okx') adapter = new OkxAdapter();
+      if (exchangeQuery === 'bybit') adapter = new BybitAdapter();
+      if (symbol.includes('XAU')) adapter = new ExnessAdapter();
+
       const ticker = await adapter.getTicker(symbol);
 
       res.json({
@@ -28,7 +36,12 @@ export class MarketController {
     try {
       const exchangeNameStr = (req.params.exchangeName as string) || 'binance';
       const exchangeName = exchangeNameStr.toLowerCase();
-      const adapter = exchangeName === 'exness' ? new ExnessAdapter() : new BinanceAdapter();
+
+      let adapter: any = new BinanceAdapter();
+      if (exchangeName === 'okx') adapter = new OkxAdapter();
+      if (exchangeName === 'bybit') adapter = new BybitAdapter();
+      if (exchangeName === 'exness') adapter = new ExnessAdapter();
+
       const symbols = await adapter.getAvailableSymbols();
 
       res.json({

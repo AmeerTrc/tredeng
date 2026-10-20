@@ -2,9 +2,19 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import { CryptoService } from '../services/cryptoService';
 import { BinanceAdapter } from '../services/exchange/binanceAdapter';
+import { OkxAdapter } from '../services/exchange/okxAdapter';
+import { BybitAdapter } from '../services/exchange/bybitAdapter';
 import { DatabaseService } from '../services/storage/databaseService';
 
 const db = DatabaseService.getInstance();
+
+function getAdapter(exchangeName: string) {
+  switch (exchangeName.toLowerCase()) {
+    case 'okx': return new OkxAdapter();
+    case 'bybit': return new BybitAdapter();
+    default: return new BinanceAdapter();
+  }
+}
 
 export class ExchangeController {
   static async saveKeys(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -23,7 +33,7 @@ export class ExchangeController {
       }
 
       const selectedExchange = (exchangeName || 'binance').toLowerCase();
-      const adapter = new BinanceAdapter();
+      const adapter = getAdapter(selectedExchange);
 
       // Test keys with real exchange before saving
       const status = await adapter.validateKeys(apiKey.trim(), apiSecret.trim());
@@ -78,7 +88,7 @@ export class ExchangeController {
       const apiKey = CryptoService.decrypt(userKeyInfo.apiKeyEncrypted);
       const apiSecret = CryptoService.decrypt(userKeyInfo.apiSecretEncrypted);
 
-      const adapter = new BinanceAdapter();
+      const adapter = getAdapter(userKeyInfo.exchangeName);
       const portfolio = await adapter.getPortfolio(apiKey, apiSecret);
 
       res.json({
@@ -115,7 +125,7 @@ export class ExchangeController {
       const apiKey = CryptoService.decrypt(userKeyInfo.apiKeyEncrypted);
       const apiSecret = CryptoService.decrypt(userKeyInfo.apiSecretEncrypted);
 
-      const adapter = new BinanceAdapter();
+      const adapter = getAdapter(userKeyInfo.exchangeName);
       const status = await adapter.validateKeys(apiKey, apiSecret);
 
       res.json({ success: true, data: status, message: 'تم جلب حالة الاتصال الحقيقية' });

@@ -116,6 +116,21 @@ export class DatabaseService {
           isActive INTEGER,
           PRIMARY KEY (userId, exchangeName, symbol)
         );
+
+        CREATE TABLE IF NOT EXISTS paper_trades (
+          id TEXT PRIMARY KEY,
+          userId TEXT,
+          exchangeName TEXT,
+          symbol TEXT,
+          action TEXT,
+          price REAL,
+          amount REAL,
+          stopLoss REAL,
+          takeProfit REAL,
+          status TEXT,
+          pnl REAL,
+          createdAt INTEGER
+        );
       `);
       console.log('SQLite database initialized successfully.');
     } catch (error) {
@@ -266,5 +281,30 @@ export class DatabaseService {
       symbol: row.symbol,
       isActive: row.isActive === 1
     }));
+  }
+
+  // Paper Trading
+  async recordPaperTrade(
+    userId: string,
+    exchangeName: string,
+    symbol: string,
+    action: string,
+    price: number,
+    amount: number,
+    stopLoss: number,
+    takeProfit: number
+  ): Promise<string> {
+    const id = `pt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    await this.db?.run(
+      `INSERT INTO paper_trades (id, userId, exchangeName, symbol, action, price, amount, stopLoss, takeProfit, status, pnl, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, userId, exchangeName, symbol, action, price, amount, stopLoss, takeProfit, 'OPEN', 0.0, Date.now()]
+    );
+    return id;
+  }
+
+  async getOpenPaperTrades(userId: string): Promise<any[]> {
+    const rows = await this.db?.all('SELECT * FROM paper_trades WHERE userId = ? AND status = ?', [userId, 'OPEN']);
+    return rows || [];
   }
 }

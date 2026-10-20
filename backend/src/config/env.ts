@@ -19,5 +19,6 @@ export const ENV = {
   JWT_SECRET: JWT_SECRET,
   AES_SECRET_KEY: AES_SECRET_KEY.substring(0, 32),
   BINANCE_BASE_URL: process.env.BINANCE_BASE_URL || 'https://api.binance.com',
-  BINANCE_TESTNET_URL: process.env.BINANCE_TESTNET_URL || 'https://testnet.binance.vision'
+  BINANCE_TESTNET_URL: process.env.BINANCE_TESTNET_URL || 'https://testnet.binance.vision',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || ''
 };
