@@ -36,4 +36,5 @@ export interface ExchangeAdapter {
   validateKeys(apiKey: string, apiSecret: string): Promise<ExchangeStatus>;
   getPortfolio(apiKey: string, apiSecret: string): Promise<PortfolioSummary>;
   getTicker(symbol: string): Promise<Ticker>;
+  getAvailableSymbols(): Promise<string[]>;
 }

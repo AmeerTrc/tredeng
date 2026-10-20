@@ -18,6 +18,7 @@ import com.tredeig.app.ui.screens.market.MarketScreen
 import com.tredeig.app.ui.screens.positions.OpenPositionsScreen
 import com.tredeig.app.ui.screens.positions.TradeHistoryScreen
 import com.tredeig.app.ui.screens.risk.RiskSettingsScreen
+import com.tredeig.app.ui.screens.risk.RiskViewModel
 import com.tredeig.app.ui.screens.security.SecurityScreen
 import com.tredeig.app.ui.screens.settings.SettingsScreen
 
@@ -26,7 +27,8 @@ fun TredeigNavGraph(
     navController: NavHostController,
     loginViewModel: LoginViewModel,
     dashboardViewModel: DashboardViewModel,
-    exchangeViewModel: ExchangeViewModel
+    exchangeViewModel: ExchangeViewModel,
+    riskViewModel: RiskViewModel
 ) {
     // Navigate directly to Dashboard as requested
     NavHost(
@@ -67,7 +69,10 @@ fun TredeigNavGraph(
         }
 
         composable(Screen.RiskSettings.route) {
-            RiskSettingsScreen(onBack = { navController.popBackStack() })
+            RiskSettingsScreen(
+                viewModel = riskViewModel,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.LiveTradingConfirmation.route) {
