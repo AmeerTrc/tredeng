@@ -34,22 +34,48 @@ data class KillSwitchRequest(
     val closePositionsHandledManually: Boolean = true
 )
 
-data class RiskSettingsDto(
-    val maxTradeRiskPct: Double,
-    val maxDailyLossPct: Double,
-    val minConfidence: Double,
-    val maxDailyTrades: Int,
-    val stopLossRequired: Boolean
+data class UserSettingsDto(
+    val totalCapitalUsdt: Double = 1000.0,
+    val tradeAmountUsdt: Double = 100.0,
+    val entryPrice: Double? = null,
+    val exitPrice: Double? = null,
+    val stopLossPricePct: Double = 2.0,
+    val takeProfitPricePct: Double = 4.0,
+    val maxDailyLossPct: Double = 1.0,
+    val maxDailyTrades: Int = 5,
+    val maxOpenPositions: Int = 3,
+    val tradingMode: String = "AUTOMATED_AI", // "AUTOMATED_AI" or "MANUAL"
+    val selectedExchange: String = "binance", // "binance", "okx", "bybit"
+    val isPaperTrading: Boolean = true,
+    val stopLossRequired: Boolean = true
 )
 
 data class SelectedCoinDto(
     val symbol: String,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val isFavorite: Boolean = false,
+    val price: Double? = null,
+    val priceChangePercent: Double? = null
 )
 
 data class SaveSelectedCoinRequest(
     val symbol: String,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val isFavorite: Boolean = false
+)
+
+data class PaperTradeDto(
+    val id: String,
+    val exchangeName: String,
+    val symbol: String,
+    val action: String,
+    val price: Double,
+    val amount: Double,
+    val stopLoss: Double,
+    val takeProfit: Double,
+    val status: String,
+    val pnl: Double,
+    val createdAt: Long
 )
 
 data class ApiResponse<T>(

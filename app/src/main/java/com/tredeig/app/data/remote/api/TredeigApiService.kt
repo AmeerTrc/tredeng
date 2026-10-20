@@ -33,22 +33,28 @@ interface TredeigApiService {
         @Path("symbol") symbol: String = "BTCUSDT"
     ): Response<ApiResponse<TickerResponse>>
 
+    @GET("api/market/symbols/{exchangeName}")
+    suspend fun getAvailableSymbols(
+        @Header("Authorization") token: String,
+        @Path("exchangeName") exchangeName: String
+    ): Response<ApiResponse<List<String>>>
+
     @POST("api/security/kill-switch")
     suspend fun toggleKillSwitch(
         @Header("Authorization") token: String,
         @Body request: KillSwitchRequest
     ): Response<ApiResponse<Boolean>>
 
-    @GET("api/security/risk")
-    suspend fun getRiskSettings(
+    @GET("api/security/settings")
+    suspend fun getUserSettings(
         @Header("Authorization") token: String
-    ): Response<ApiResponse<RiskSettingsDto>>
+    ): Response<ApiResponse<UserSettingsDto>>
 
-    @POST("api/security/risk")
-    suspend fun saveRiskSettings(
+    @POST("api/security/settings")
+    suspend fun saveUserSettings(
         @Header("Authorization") token: String,
-        @Body request: RiskSettingsDto
-    ): Response<ApiResponse<RiskSettingsDto>>
+        @Body request: UserSettingsDto
+    ): Response<ApiResponse<UserSettingsDto>>
 
     @GET("api/market/coins/{exchangeName}")
     suspend fun getSelectedCoins(
@@ -62,4 +68,9 @@ interface TredeigApiService {
         @Path("exchangeName") exchangeName: String,
         @Body request: SaveSelectedCoinRequest
     ): Response<ApiResponse<Any>>
+
+    @GET("api/exchange/paper-trades")
+    suspend fun getPaperTrades(
+        @Header("Authorization") token: String
+    ): Response<ApiResponse<List<PaperTradeDto>>>
 }
