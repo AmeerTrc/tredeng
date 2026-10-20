@@ -28,6 +28,11 @@ class MainActivity : ComponentActivity() {
         val dashboardViewModel = DashboardViewModel(exchangeRepo, marketRepo)
         val exchangeViewModel = ExchangeViewModel(exchangeRepo)
 
+        // Hardcoding credentials as requested to use directly in the app
+        val hardcodedEmail = "test@example.com"
+        val hardcodedPassword = "password123"
+        loginViewModel.login(hardcodedEmail, hardcodedPassword)
+
         setContent {
             TredeigTheme {
                 val navController = rememberNavController()

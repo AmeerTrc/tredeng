@@ -28,9 +28,10 @@ fun TredeigNavGraph(
     dashboardViewModel: DashboardViewModel,
     exchangeViewModel: ExchangeViewModel
 ) {
+    // Navigate directly to Dashboard as requested
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route
+        startDestination = Screen.Dashboard.route
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
