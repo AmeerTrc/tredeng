@@ -17,7 +17,7 @@ import com.tredeig.app.ui.screens.exchange.ExchangeViewModel
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate()
+        super.onCreate(savedInstanceState)
 
         val encryptedStorage = EncryptedStorage(applicationContext)
         val authRepo = AuthRepositoryImpl(encryptedStorage)
