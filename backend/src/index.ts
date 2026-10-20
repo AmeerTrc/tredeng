@@ -5,6 +5,7 @@ import authRoutes from './routes/authRoutes';
 import exchangeRoutes from './routes/exchangeRoutes';
 import marketRoutes from './routes/marketRoutes';
 import securityRoutes from './routes/securityRoutes';
+import { DatabaseService } from './services/storage/databaseService';
 
 const app = express();
 
@@ -27,10 +28,15 @@ app.get('/', (req, res) => {
   });
 });
 
-app.listen(ENV.PORT, () => {
-  console.log(`=======================================================`);
-  console.log(` Tredeig Backend running on http://localhost:${ENV.PORT}`);
-  console.log(` Phase 1 active: Spot Balance & Market Data ONLY.`);
-  console.log(` Live trading orders disabled until Phase 2 trigger.`);
-  console.log(`=======================================================`);
+// Init DB and Start Server
+DatabaseService.getInstance().init().then(() => {
+  app.listen(ENV.PORT, () => {
+    console.log(`=======================================================`);
+    console.log(` Tredeig Backend running on http://localhost:${ENV.PORT}`);
+    console.log(` Phase 2 active: Database initialized. Independent Exchanges + Live Settings.`);
+    console.log(`=======================================================`);
+  });
+}).catch(err => {
+  console.error("Failed to initialize database", err);
+  process.exit(1);
 });

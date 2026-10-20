@@ -1,5 +1,7 @@
-import fs from 'fs';
+import sqlite3 from 'sqlite3';
+import { open, Database } from 'sqlite';
 import path from 'path';
+import fs from 'fs';
 import { EncryptedData } from '../cryptoService';
 
 export interface UserRecord {
@@ -33,28 +35,22 @@ export interface UserRiskSettings {
   updatedAt: number;
 }
 
-interface DatabaseSchema {
-  users: Record<string, UserRecord>;
-  exchangeKeys: Record<string, UserExchangeKeys>;
-  securitySettings: Record<string, UserSecuritySettings>;
-  riskSettings: Record<string, UserRiskSettings>;
+export interface SelectedCoin {
+  userId: string;
+  exchangeName: string;
+  symbol: string;
+  isActive: boolean;
 }
 
 const DATA_DIR = path.resolve(__dirname, '../../../data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
+const DB_FILE = path.join(DATA_DIR, 'database.sqlite');
 
 export class DatabaseService {
   private static instance: DatabaseService;
-  private data: DatabaseSchema = {
-    users: {},
-    exchangeKeys: {},
-    securitySettings: {},
-    riskSettings: {}
-  };
+  private db: Database | null = null;
+  private isInitializing = false;
 
-  private constructor() {
-    this.init();
-  }
+  private constructor() {}
 
   static getInstance(): DatabaseService {
     if (!DatabaseService.instance) {
@@ -63,120 +59,180 @@ export class DatabaseService {
     return DatabaseService.instance;
   }
 
-  private init(): void {
+  async init(): Promise<void> {
+    if (this.db || this.isInitializing) return;
+    this.isInitializing = true;
     try {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }
-      if (fs.existsSync(DB_FILE)) {
-        const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        this.data = JSON.parse(raw);
-      } else {
-        this.save();
-      }
-    } catch (error) {
-      console.error('Error initializing DatabaseService:', error);
-    }
-  }
 
-  private save(): void {
-    try {
-      fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
+      this.db = await open({
+        filename: DB_FILE,
+        driver: sqlite3.Database
+      });
+
+      await this.db.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE,
+          passwordHash TEXT,
+          createdAt INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS exchange_keys (
+          userId TEXT,
+          exchangeName TEXT,
+          apiKeyIv TEXT,
+          apiKeyContent TEXT,
+          apiSecretIv TEXT,
+          apiSecretContent TEXT,
+          updatedAt INTEGER,
+          PRIMARY KEY (userId, exchangeName)
+        );
+
+        CREATE TABLE IF NOT EXISTS security_settings (
+          userId TEXT PRIMARY KEY,
+          isKillSwitchActive INTEGER,
+          updatedAt INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS risk_settings (
+          userId TEXT PRIMARY KEY,
+          maxTradeRiskPct REAL,
+          maxDailyLossPct REAL,
+          minConfidence REAL,
+          maxDailyTrades INTEGER,
+          stopLossRequired INTEGER,
+          updatedAt INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS selected_coins (
+          userId TEXT,
+          exchangeName TEXT,
+          symbol TEXT,
+          isActive INTEGER,
+          PRIMARY KEY (userId, exchangeName, symbol)
+        );
+      `);
+      console.log('SQLite database initialized successfully.');
     } catch (error) {
-      console.error('Error saving database to file:', error);
+      console.error('Error initializing SQLite database:', error);
+      throw error;
+    } finally {
+      this.isInitializing = false;
     }
   }
 
   // User Management
-  getUserByEmail(email: string): UserRecord | null {
+  async getUserByEmail(email: string): Promise<UserRecord | null> {
     const normalized = email.trim().toLowerCase();
-    for (const user of Object.values(this.data.users)) {
-      if (user.email.toLowerCase() === normalized) {
-        return user;
-      }
-    }
-    return null;
+    const row = await this.db?.get('SELECT * FROM users WHERE LOWER(email) = ?', normalized);
+    return row as UserRecord || null;
   }
 
-  getUserById(id: string): UserRecord | null {
-    return this.data.users[id] || null;
+  async getUserById(id: string): Promise<UserRecord | null> {
+    const row = await this.db?.get('SELECT * FROM users WHERE id = ?', id);
+    return row as UserRecord || null;
   }
 
-  createUser(email: string, passwordHash: string): UserRecord {
+  async createUser(email: string, passwordHash: string): Promise<UserRecord> {
     const id = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const user: UserRecord = {
-      id,
-      email: email.trim().toLowerCase(),
-      passwordHash,
-      createdAt: Date.now()
+    const normalizedEmail = email.trim().toLowerCase();
+    const createdAt = Date.now();
+    await this.db?.run(
+      'INSERT INTO users (id, email, passwordHash, createdAt) VALUES (?, ?, ?, ?)',
+      [id, normalizedEmail, passwordHash, createdAt]
+    );
+    return { id, email: normalizedEmail, passwordHash, createdAt };
+  }
+
+  // Exchange Keys
+  async saveExchangeKeys(userId: string, exchangeName: string, apiKeyEncrypted: EncryptedData, apiSecretEncrypted: EncryptedData): Promise<void> {
+    await this.db?.run(
+      `INSERT INTO exchange_keys (userId, exchangeName, apiKeyIv, apiKeyContent, apiSecretIv, apiSecretContent, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(userId, exchangeName) DO UPDATE SET
+       apiKeyIv=excluded.apiKeyIv, apiKeyContent=excluded.apiKeyContent,
+       apiSecretIv=excluded.apiSecretIv, apiSecretContent=excluded.apiSecretContent,
+       updatedAt=excluded.updatedAt`,
+      [userId, exchangeName, apiKeyEncrypted.iv, apiKeyEncrypted.content, apiSecretEncrypted.iv, apiSecretEncrypted.content, Date.now()]
+    );
+  }
+
+  async getExchangeKeys(userId: string, exchangeName: string): Promise<UserExchangeKeys | null> {
+    const row = await this.db?.get('SELECT * FROM exchange_keys WHERE userId = ? AND exchangeName = ?', [userId, exchangeName]);
+    if (!row) return null;
+    return {
+      userId: row.userId,
+      exchangeName: row.exchangeName,
+      apiKeyEncrypted: { iv: row.apiKeyIv, content: row.apiKeyContent },
+      apiSecretEncrypted: { iv: row.apiSecretIv, content: row.apiSecretContent },
+      updatedAt: row.updatedAt
     };
-    this.data.users[id] = user;
-    this.save();
-    return user;
   }
 
-  // Exchange Keys Management (User Isolated)
-  saveExchangeKeys(userId: string, exchangeName: string, apiKeyEncrypted: EncryptedData, apiSecretEncrypted: EncryptedData): void {
-    this.data.exchangeKeys[userId] = {
-      userId,
-      exchangeName: exchangeName || 'binance',
-      apiKeyEncrypted,
-      apiSecretEncrypted,
-      updatedAt: Date.now()
-    };
-    this.save();
+  async getAllExchangeKeys(userId: string): Promise<UserExchangeKeys[]> {
+    const rows = await this.db?.all('SELECT * FROM exchange_keys WHERE userId = ?', [userId]);
+    return (rows || []).map(row => ({
+      userId: row.userId,
+      exchangeName: row.exchangeName,
+      apiKeyEncrypted: { iv: row.apiKeyIv, content: row.apiKeyContent },
+      apiSecretEncrypted: { iv: row.apiSecretIv, content: row.apiSecretContent },
+      updatedAt: row.updatedAt
+    }));
   }
 
-  getExchangeKeys(userId: string): UserExchangeKeys | null {
-    return this.data.exchangeKeys[userId] || null;
+  async deleteExchangeKeys(userId: string, exchangeName: string): Promise<void> {
+    await this.db?.run('DELETE FROM exchange_keys WHERE userId = ? AND exchangeName = ?', [userId, exchangeName]);
   }
 
-  deleteExchangeKeys(userId: string): void {
-    delete this.data.exchangeKeys[userId];
-    this.save();
+  // Security / Kill Switch
+  async setKillSwitch(userId: string, active: boolean): Promise<void> {
+    await this.db?.run(
+      `INSERT INTO security_settings (userId, isKillSwitchActive, updatedAt)
+       VALUES (?, ?, ?)
+       ON CONFLICT(userId) DO UPDATE SET isKillSwitchActive=excluded.isKillSwitchActive, updatedAt=excluded.updatedAt`,
+      [userId, active ? 1 : 0, Date.now()]
+    );
   }
 
-  // Security / Kill Switch Management (User Isolated)
-  setKillSwitch(userId: string, active: boolean): void {
-    this.data.securitySettings[userId] = {
-      userId,
-      isKillSwitchActive: active,
-      updatedAt: Date.now()
-    };
-    this.save();
+  async isKillSwitchActive(userId: string): Promise<boolean> {
+    const row = await this.db?.get('SELECT isKillSwitchActive FROM security_settings WHERE userId = ?', [userId]);
+    return row ? row.isKillSwitchActive === 1 : false;
   }
 
-  isKillSwitchActive(userId: string): boolean {
-    const setting = this.data.securitySettings[userId];
-    return setting ? setting.isKillSwitchActive : false;
-  }
+  // Risk Settings
+  async saveRiskSettings(userId: string, settings: Partial<UserRiskSettings>): Promise<UserRiskSettings> {
+    const current = await this.getRiskSettings(userId);
+    const updated = { ...current, ...settings, updatedAt: Date.now() };
 
-  // Risk Settings Management (User Isolated)
-  saveRiskSettings(userId: string, settings: Partial<UserRiskSettings>): UserRiskSettings {
-    const existing = this.data.riskSettings[userId] || {
-      userId,
-      maxTradeRiskPct: 0.25,
-      maxDailyLossPct: 1.0,
-      minConfidence: 0.70,
-      maxDailyTrades: 3,
-      stopLossRequired: true,
-      updatedAt: Date.now()
-    };
-
-    const updated: UserRiskSettings = {
-      ...existing,
-      ...settings,
-      userId,
-      updatedAt: Date.now()
-    };
-
-    this.data.riskSettings[userId] = updated;
-    this.save();
+    await this.db?.run(
+      `INSERT INTO risk_settings (userId, maxTradeRiskPct, maxDailyLossPct, minConfidence, maxDailyTrades, stopLossRequired, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(userId) DO UPDATE SET
+       maxTradeRiskPct=excluded.maxTradeRiskPct, maxDailyLossPct=excluded.maxDailyLossPct,
+       minConfidence=excluded.minConfidence, maxDailyTrades=excluded.maxDailyTrades,
+       stopLossRequired=excluded.stopLossRequired, updatedAt=excluded.updatedAt`,
+      [userId, updated.maxTradeRiskPct, updated.maxDailyLossPct, updated.minConfidence, updated.maxDailyTrades, updated.stopLossRequired ? 1 : 0, updated.updatedAt]
+    );
     return updated;
   }
 
-  getRiskSettings(userId: string): UserRiskSettings {
-    return this.data.riskSettings[userId] || {
+  async getRiskSettings(userId: string): Promise<UserRiskSettings> {
+    const row = await this.db?.get('SELECT * FROM risk_settings WHERE userId = ?', [userId]);
+    if (row) {
+      return {
+        userId: row.userId,
+        maxTradeRiskPct: row.maxTradeRiskPct,
+        maxDailyLossPct: row.maxDailyLossPct,
+        minConfidence: row.minConfidence,
+        maxDailyTrades: row.maxDailyTrades,
+        stopLossRequired: row.stopLossRequired === 1,
+        updatedAt: row.updatedAt
+      };
+    }
+    return {
       userId,
       maxTradeRiskPct: 0.25,
       maxDailyLossPct: 1.0,
@@ -185,5 +241,28 @@ export class DatabaseService {
       stopLossRequired: true,
       updatedAt: Date.now()
     };
+  }
+
+  // Selected Coins
+  async saveSelectedCoin(userId: string, exchangeName: string, symbol: string, isActive: boolean): Promise<void> {
+    await this.db?.run(
+      `INSERT INTO selected_coins (userId, exchangeName, symbol, isActive)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(userId, exchangeName, symbol) DO UPDATE SET isActive=excluded.isActive`,
+      [userId, exchangeName, symbol, isActive ? 1 : 0]
+    );
+  }
+
+  async getSelectedCoins(userId: string, exchangeName: string): Promise<SelectedCoin[]> {
+    const rows = await this.db?.all(
+      'SELECT * FROM selected_coins WHERE userId = ? AND exchangeName = ? AND isActive = 1',
+      [userId, exchangeName]
+    );
+    return (rows || []).map(row => ({
+      userId: row.userId,
+      exchangeName: row.exchangeName,
+      symbol: row.symbol,
+      isActive: row.isActive === 1
+    }));
   }
 }
