@@ -12,22 +12,17 @@ export interface MarketDataSnapshot {
 }
 
 export class GeminiService {
-  private genAI: GoogleGenerativeAI | null = null;
-
-  constructor() {
-    if (ENV.GEMINI_API_KEY) {
-      this.genAI = new GoogleGenerativeAI(ENV.GEMINI_API_KEY);
-    }
-  }
-
   async analyzeMarket(snapshot: MarketDataSnapshot): Promise<TradeSignal> {
-    if (!this.genAI || !ENV.GEMINI_API_KEY) {
+    const apiKey = ENV.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+
+    if (!apiKey || apiKey.trim().length === 0) {
       throw new Error("خطأ: مفتاح GEMINI_API_KEY غير مكوّن في الخادم. تعذر إجراء تحليل الذكاء الاصطناعي.");
     }
 
     try {
-      // Using gemini-1.5-flash (fast and supported on standard Gemini API keys)
-      const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const genAI = new GoogleGenerativeAI(apiKey.trim());
+      // Try gemini-1.5-flash as default supported model
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const prompt = `
       You are an expert algorithmic trading AI. Analyze the following 24h market snapshot for ${snapshot.symbol}.
@@ -72,8 +67,8 @@ export class GeminiService {
       };
 
     } catch (error: any) {
-      console.error("Gemini AI Analysis Error:", error);
-      throw new Error(`فشل تحليل الذكاء الاصطناعي (Gemini Error): ${error.message}`);
+      console.error("Gemini AI Analysis Error:", error.message || error);
+      throw new Error(`فشل تحليل الذكاء الاصطناعي (Gemini Error): ${error.message || error}`);
     }
   }
 }

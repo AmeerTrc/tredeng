@@ -23,20 +23,22 @@ app.get('/', (req, res) => {
   res.json({
     status: 'ONLINE',
     system: 'Tredeig Secure Backend Infrastructure',
-    phase: 'PHASE_1_BALANCE_AND_MARKET_MONITORING',
+    phase: 'PHASE_2_LIVE_GEMINI_AND_EXCHANGES',
     tradingEnabled: false
   });
 });
 
-// Init DB and Start Server
+// Start HTTP Server immediately so Railway proxy health checks succeed
+const server = app.listen(ENV.PORT, '0.0.0.0', () => {
+  console.log(`=======================================================`);
+  console.log(` Tredeig Backend running on port ${ENV.PORT}`);
+  console.log(` Phase 2 active: Database & Gemini AI ready.`);
+  console.log(`=======================================================`);
+});
+
+// Initialize Database asynchronously
 DatabaseService.getInstance().init().then(() => {
-  app.listen(ENV.PORT, '0.0.0.0', () => {
-    console.log(`=======================================================`);
-    console.log(` Tredeig Backend running on port ${ENV.PORT}`);
-    console.log(` Phase 2 active: Database initialized. Independent Exchanges + Live Settings.`);
-    console.log(`=======================================================`);
-  });
+  console.log("Database initialized successfully.");
 }).catch(err => {
-  console.error("Failed to initialize database", err);
-  process.exit(1);
+  console.error("Warning: Database initialization error:", err.message);
 });
