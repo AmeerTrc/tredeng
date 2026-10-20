@@ -69,8 +69,19 @@ interface TredeigApiService {
         @Body request: SaveSelectedCoinRequest
     ): Response<ApiResponse<Any>>
 
-    @GET("api/exchange/paper-trades")
-    suspend fun getPaperTrades(
+    @GET("api/exchange/positions")
+    suspend fun getOpenPositions(
+        @Header("Authorization") token: String
+    ): Response<ApiResponse<List<PaperTradeDto>>>
+
+    @POST("api/exchange/positions/close")
+    suspend fun closePosition(
+        @Header("Authorization") token: String,
+        @Body request: ClosePositionRequest
+    ): Response<ApiResponse<Any>>
+
+    @GET("api/exchange/history")
+    suspend fun getTradeHistory(
         @Header("Authorization") token: String
     ): Response<ApiResponse<List<PaperTradeDto>>>
 }

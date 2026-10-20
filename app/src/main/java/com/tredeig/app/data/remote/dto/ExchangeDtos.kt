@@ -64,18 +64,27 @@ data class SaveSelectedCoinRequest(
     val isFavorite: Boolean = false
 )
 
+data class ClosePositionRequest(
+    val tradeId: String
+)
+
 data class PaperTradeDto(
     val id: String,
     val exchangeName: String,
     val symbol: String,
     val action: String,
     val price: Double,
+    val exitPrice: Double? = null,
+    val currentPrice: Double? = null,
     val amount: Double,
     val stopLoss: Double,
     val takeProfit: Double,
     val status: String,
-    val pnl: Double,
-    val createdAt: Long
+    val pnl: Double = 0.0,
+    val pnlPct: Double? = null,
+    val fee: Double? = null,
+    val createdAt: Long,
+    val closedAt: Long? = null
 )
 
 data class ApiResponse<T>(

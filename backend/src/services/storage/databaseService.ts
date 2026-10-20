@@ -180,12 +180,15 @@ export class DatabaseService {
           symbol TEXT,
           action TEXT,
           price REAL,
+          exitPrice REAL,
           amount REAL,
           stopLoss REAL,
           takeProfit REAL,
           status TEXT,
           pnl REAL,
-          createdAt INTEGER
+          fee REAL,
+          createdAt INTEGER,
+          closedAt INTEGER
         );
       `);
       console.log('SQLite database initialized successfully.');
@@ -533,7 +536,7 @@ export class DatabaseService {
     takeProfit: number
   ): Promise<string> {
     const id = `pt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const trade = { id, userId, exchangeName, symbol, action, price, amount, stopLoss, takeProfit, status: 'OPEN', pnl: 0.0, createdAt: Date.now() };
+    const trade = { id, userId, exchangeName, symbol, action, price, exitPrice: null, amount, stopLoss, takeProfit, status: 'OPEN', pnl: 0.0, fee: 0.0, createdAt: Date.now(), closedAt: null };
 
     if (this.isFallback) {
       this.memoryDb.paperTrades[id] = trade;
@@ -542,11 +545,31 @@ export class DatabaseService {
     }
 
     await this.db?.run(
-      `INSERT INTO paper_trades (id, userId, exchangeName, symbol, action, price, amount, stopLoss, takeProfit, status, pnl, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, userId, exchangeName, symbol, action, price, amount, stopLoss, takeProfit, 'OPEN', 0.0, Date.now()]
+      `INSERT INTO paper_trades (id, userId, exchangeName, symbol, action, price, exitPrice, amount, stopLoss, takeProfit, status, pnl, fee, createdAt, closedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, userId, exchangeName, symbol, action, price, null, amount, stopLoss, takeProfit, 'OPEN', 0.0, 0.0, Date.now(), null]
     );
     return id;
+  }
+
+  async closePaperTrade(id: string, exitPrice: number, pnl: number, fee: number): Promise<void> {
+    const closedAt = Date.now();
+    if (this.isFallback) {
+      if (this.memoryDb.paperTrades[id]) {
+        this.memoryDb.paperTrades[id].status = 'CLOSED';
+        this.memoryDb.paperTrades[id].exitPrice = exitPrice;
+        this.memoryDb.paperTrades[id].pnl = pnl;
+        this.memoryDb.paperTrades[id].fee = fee;
+        this.memoryDb.paperTrades[id].closedAt = closedAt;
+        this.saveFallback();
+      }
+      return;
+    }
+
+    await this.db?.run(
+      `UPDATE paper_trades SET status = 'CLOSED', exitPrice = ?, pnl = ?, fee = ?, closedAt = ? WHERE id = ?`,
+      [exitPrice, pnl, fee, closedAt, id]
+    );
   }
 
   async getOpenPaperTrades(userId: string): Promise<any[]> {
@@ -554,6 +577,14 @@ export class DatabaseService {
       return Object.values(this.memoryDb.paperTrades).filter(t => t.userId === userId && t.status === 'OPEN');
     }
     const rows = await this.db?.all('SELECT * FROM paper_trades WHERE userId = ? AND status = ?', [userId, 'OPEN']);
+    return rows || [];
+  }
+
+  async getClosedPaperTrades(userId: string): Promise<any[]> {
+    if (this.isFallback) {
+      return Object.values(this.memoryDb.paperTrades).filter(t => t.userId === userId && t.status === 'CLOSED');
+    }
+    const rows = await this.db?.all('SELECT * FROM paper_trades WHERE userId = ? AND status = ? ORDER BY closedAt DESC', [userId, 'CLOSED']);
     return rows || [];
   }
 }

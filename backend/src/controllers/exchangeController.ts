@@ -5,6 +5,7 @@ import { BinanceAdapter } from '../services/exchange/binanceAdapter';
 import { OkxAdapter } from '../services/exchange/okxAdapter';
 import { BybitAdapter } from '../services/exchange/bybitAdapter';
 import { DatabaseService } from '../services/storage/databaseService';
+import { PaperTradingEngine } from '../services/trading/paperTradingEngine';
 
 const db = DatabaseService.getInstance();
 
@@ -132,14 +133,73 @@ export class ExchangeController {
     }
   }
 
-  static async getPaperTrades(req: AuthenticatedRequest, res: Response): Promise<void> {
+  static async getOpenPositions(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
+      // Trigger a position monitoring check
+      await PaperTradingEngine.monitorOpenPositions(userId);
+
       const openTrades = await db.getOpenPaperTrades(userId);
+      const enrichedTrades = [];
+
+      for (const trade of openTrades) {
+        try {
+          const adapter = getAdapter(trade.exchangeName || 'binance');
+          const ticker = await adapter.getTicker(trade.symbol);
+          const currentPrice = ticker.price;
+          const pnl = ((currentPrice - trade.price) / trade.price) * trade.amount;
+          const pnlPct = ((currentPrice - trade.price) / trade.price) * 100;
+
+          enrichedTrades.push({
+            ...trade,
+            currentPrice,
+            pnl,
+            pnlPct
+          });
+        } catch (e) {
+          enrichedTrades.push(trade);
+        }
+      }
+
       res.json({
         success: true,
-        data: openTrades,
-        message: 'تم جلب الصفقات الافتراضية بنجاح'
+        data: enrichedTrades,
+        message: 'تم جلب الصفقات المفتوحة مع الأسعار الحية بنجاح'
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
+  static async closePosition(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const { tradeId } = req.body;
+
+      if (!tradeId) {
+        res.status(400).json({ success: false, data: null, message: 'معرف الصفقة (tradeId) مطلوب' });
+        return;
+      }
+
+      const closed = await PaperTradingEngine.closePositionManually(userId, tradeId);
+      if (closed) {
+        res.json({ success: true, data: null, message: 'تم إغلاق الصفقة يدوياً بنجاح' });
+      } else {
+        res.status(400).json({ success: false, data: null, message: 'الصفقة غير موجودة أو مغلقة بالفعل' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
+  static async getTradeHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const closedTrades = await db.getClosedPaperTrades(userId);
+      res.json({
+        success: true,
+        data: closedTrades,
+        message: 'تم جلب سجل الصفقات المغلقة بنجاح'
       });
     } catch (error: any) {
       res.status(500).json({ success: false, data: null, message: error.message });

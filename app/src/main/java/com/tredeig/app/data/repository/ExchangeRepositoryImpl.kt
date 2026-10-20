@@ -144,13 +144,39 @@ class ExchangeRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
         }
     }
 
-    suspend fun getPaperTrades(): Resource<List<PaperTradeDto>> = withContext(Dispatchers.IO) {
+    suspend fun getOpenPositions(): Resource<List<PaperTradeDto>> = withContext(Dispatchers.IO) {
         try {
-            val response = ApiClient.instance.getPaperTrades(getAuthHeader())
+            val response = ApiClient.instance.getOpenPositions(getAuthHeader())
             if (response.isSuccessful && response.body()?.success == true) {
                 Resource.Success(response.body()!!.data ?: emptyList())
             } else {
-                Resource.Error(response.body()?.message ?: "فشل جلب الصفقات")
+                Resource.Error(response.body()?.message ?: "فشل جلب الصفقات المفتوحة")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun closePosition(tradeId: String): Resource<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.closePosition(getAuthHeader(), ClosePositionRequest(tradeId))
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(Unit)
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل إغلاق الصفقة")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun getTradeHistory(): Resource<List<PaperTradeDto>> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.getTradeHistory(getAuthHeader())
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(response.body()!!.data ?: emptyList())
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل جلب سجل الصفقات")
             }
         } catch (e: Exception) {
             Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")

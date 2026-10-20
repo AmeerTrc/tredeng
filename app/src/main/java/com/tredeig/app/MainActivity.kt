@@ -14,6 +14,7 @@ import com.tredeig.app.ui.screens.auth.LoginViewModel
 import com.tredeig.app.ui.screens.dashboard.DashboardViewModel
 import com.tredeig.app.ui.screens.exchange.ExchangeViewModel
 import com.tredeig.app.ui.screens.market.MarketViewModel
+import com.tredeig.app.ui.screens.positions.PositionsViewModel
 import com.tredeig.app.ui.screens.risk.RiskViewModel
 
 class MainActivity : ComponentActivity() {
@@ -31,6 +32,7 @@ class MainActivity : ComponentActivity() {
         val exchangeViewModel = ExchangeViewModel(exchangeRepo)
         val riskViewModel = RiskViewModel(exchangeRepo)
         val marketViewModel = MarketViewModel(exchangeRepo)
+        val positionsViewModel = PositionsViewModel(exchangeRepo)
 
         // Hardcoding credentials as requested to use directly in the app
         val hardcodedEmail = "test@example.com"
@@ -46,7 +48,8 @@ class MainActivity : ComponentActivity() {
                     dashboardViewModel = dashboardViewModel,
                     exchangeViewModel = exchangeViewModel,
                     riskViewModel = riskViewModel,
-                    marketViewModel = marketViewModel
+                    marketViewModel = marketViewModel,
+                    positionsViewModel = positionsViewModel
                 )
             }
         }

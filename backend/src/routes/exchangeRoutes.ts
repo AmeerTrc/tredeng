@@ -7,6 +7,10 @@ const router = Router();
 router.post('/keys', authMiddleware as any, ExchangeController.saveKeys as any);
 router.get('/balance', authMiddleware as any, ExchangeController.getBalance as any);
 router.get('/status', authMiddleware as any, ExchangeController.getStatus as any);
-router.get('/paper-trades', authMiddleware as any, ExchangeController.getPaperTrades as any);
+
+// Positions & History
+router.get('/positions', authMiddleware as any, ExchangeController.getOpenPositions as any);
+router.post('/positions/close', authMiddleware as any, ExchangeController.closePosition as any);
+router.get('/history', authMiddleware as any, ExchangeController.getTradeHistory as any);
 
 export default router;
