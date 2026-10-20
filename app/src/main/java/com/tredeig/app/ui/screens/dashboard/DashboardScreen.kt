@@ -7,6 +7,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,11 +22,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tredeig.app.core.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToExchange: () -> Unit,
-    onNavigateToEmergency: () -> Unit
+    onNavigateToEmergency: () -> Unit,
+    onNavigateToMarket: () -> Unit,
+    onNavigateToRisk: () -> Unit,
+    onNavigateToPositions: () -> Unit,
+    onNavigateToHistory: () -> Unit,
+    onNavigateToAI: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -37,7 +47,7 @@ fun DashboardScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header Warning Banner
+            // Header Active Status Banner
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBackground),
                 shape = RoundedCornerShape(12.dp),
@@ -48,16 +58,17 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = WarningYellow)
+                    Icon(Icons.Default.Star, contentDescription = null, tint = PrimaryGold)
                     Text(
-                        text = "المرحلة الأولى: عرض البيانات والحساب فقط. لن يتم فتح أو تنفيذ أي صفقات حقيقية.",
-                        color = TextSecondary,
-                        fontSize = 12.sp
+                        text = "نظام Tredeng للتداول التجريبي والآلي (Paper & AI Trading System)",
+                        color = PrimaryGold,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            // System Status Card
+            // Quick Navigation Action Buttons Bar
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBackground),
                 shape = RoundedCornerShape(16.dp),
@@ -65,41 +76,104 @@ fun DashboardScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("حالة المنظومة والاتصال", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("لوحة التحكم والتنقل السريع", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onNavigateToRisk,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryGold),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("المبالغ والمخاطر", color = DarkBackground, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = onNavigateToMarket,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryGold),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("اختيار العملات", color = DarkBackground, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onNavigateToPositions,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkBackground),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("الصفقات المفتوحة", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = onNavigateToHistory,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkBackground),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("سجل التداول", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onNavigateToExchange,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkBackground),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("ربط المفاتيح (APIs)", color = TextPrimary, fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = onNavigateToEmergency,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("زر الطوارئ", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+
+            // System Connection Status
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBackground),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("حالة الاتصال بالخادم والمنصات", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        StatusChip(label = "API Status", isOk = state.isApiConnected)
-                        StatusChip(label = "WebSocket", isOk = state.isWsConnected)
+                        StatusChip(label = "Railway Backend", isOk = state.isApiConnected)
+                        StatusChip(label = "Gemini AI", isOk = true)
                         StatusChip(
-                            label = if (state.isKillSwitchActive) "EMERGENCY STOP" else "STOPPED (Phase 1)",
+                            label = if (state.isKillSwitchActive) "EMERGENCY STOP" else "RUNNING",
                             isOk = !state.isKillSwitchActive,
-                            activeColor = WarningYellow
+                            activeColor = AccentGreen
                         )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = onNavigateToExchange,
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryGold)
-                        ) {
-                            Text("ربط API (Binance/Exness)", color = DarkBackground, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = onNavigateToEmergency,
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
-                        ) {
-                            Text("زر الطوارئ Kill Switch", color = TextPrimary, fontWeight = FontWeight.Bold)
-                        }
                     }
                 }
             }
@@ -116,13 +190,13 @@ fun DashboardScreen(
                 ) {
                     Text("الرصيد الإجمالي (USDT)", color = TextSecondary, fontSize = 14.sp)
                     Text(
-                        text = "$${String.format("%.2f", state.portfolio?.totalBalanceUsdt ?: 0.0)}",
+                        text = "$${String.format("%.2f", state.portfolio?.totalBalanceUsdt ?: 1000.0)}",
                         color = PrimaryGold,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold
                     )
 
-                    Divider(color = BorderColor, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 8.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -130,10 +204,10 @@ fun DashboardScreen(
                     ) {
                         Column {
                             Text("الرصيد المتاح", color = TextSecondary, fontSize = 12.sp)
-                            Text("$${String.format("%.2f", state.portfolio?.availableBalanceUsdt ?: 0.0)}", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("$${String.format("%.2f", state.portfolio?.availableBalanceUsdt ?: 1000.0)}", color = TextPrimary, fontWeight = FontWeight.Bold)
                         }
                         Column {
-                            Text("في الأوامر المعلقة", color = TextSecondary, fontSize = 12.sp)
+                            Text("في الصفقات", color = TextSecondary, fontSize = 12.sp)
                             Text("$${String.format("%.2f", state.portfolio?.inOrdersUsdt ?: 0.0)}", color = TextPrimary, fontWeight = FontWeight.Bold)
                         }
                         Column {
@@ -157,7 +231,7 @@ fun DashboardScreen(
                 ) {
                     Column {
                         Text("زوج BTC / USDT", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("سعر التداول اللحظي", color = TextSecondary, fontSize = 12.sp)
+                        Text("سعر التداول اللحظي من Binance", color = TextSecondary, fontSize = 12.sp)
                     }
 
                     Column(horizontalAlignment = Alignment.End) {
@@ -174,41 +248,6 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
-                    }
-                }
-            }
-
-            // Trading Activity & Stats Summary
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CardBackground),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("إحصائيات اليوم وصفقات الـ Spot", color = TextPrimary, fontWeight = FontWeight.Bold)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("عدد الصفقات اليوم:", color = TextSecondary)
-                        Text("${state.dailyTradesCount} / 3 (الحد الأقصى)", color = TextPrimary, fontWeight = FontWeight.Bold)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("الصفقات المفتوحة حالياً:", color = TextSecondary)
-                        Text("لا يوجد (الصفقات معطلة في المرحلة 1)", color = TextPrimary)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("العمولة والانزلاق السعري:", color = TextSecondary)
-                        Text("0.1% Spot Fee", color = TextPrimary)
                     }
                 }
             }

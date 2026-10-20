@@ -53,7 +53,12 @@ fun TredeigNavGraph(
             DashboardScreen(
                 viewModel = dashboardViewModel,
                 onNavigateToExchange = { navController.navigate(Screen.ExchangeConnection.route) },
-                onNavigateToEmergency = { navController.navigate(Screen.EmergencyStop.route) }
+                onNavigateToEmergency = { navController.navigate(Screen.EmergencyStop.route) },
+                onNavigateToMarket = { navController.navigate(Screen.Market.route) },
+                onNavigateToRisk = { navController.navigate(Screen.RiskSettings.route) },
+                onNavigateToPositions = { navController.navigate(Screen.OpenPositions.route) },
+                onNavigateToHistory = { navController.navigate(Screen.TradeHistory.route) },
+                onNavigateToAI = { navController.navigate(Screen.AIAssistant.route) }
             )
         }
 
