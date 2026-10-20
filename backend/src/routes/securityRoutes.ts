@@ -10,4 +10,7 @@ router.get('/kill-switch', authMiddleware as any, SecurityController.getKillSwit
 router.get('/risk', authMiddleware as any, SecurityController.getRiskSettings as any);
 router.post('/risk', authMiddleware as any, SecurityController.saveRiskSettings as any);
 
+router.get('/settings', authMiddleware as any, SecurityController.getUserSettings as any);
+router.post('/settings', authMiddleware as any, SecurityController.saveUserSettings as any);
+
 export default router;

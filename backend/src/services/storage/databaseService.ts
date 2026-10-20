@@ -33,6 +33,24 @@ export interface UserRiskSettings {
   updatedAt: number;
 }
 
+export interface UserSettings {
+  userId: string;
+  totalCapitalUsdt: number;
+  tradeAmountUsdt: number;
+  entryPrice?: number;
+  exitPrice?: number;
+  stopLossPricePct: number;
+  takeProfitPricePct: number;
+  maxDailyLossPct: number;
+  maxDailyTrades: number;
+  maxOpenPositions: number;
+  tradingMode: string;
+  selectedExchange: string;
+  isPaperTrading: boolean;
+  stopLossRequired: boolean;
+  updatedAt: number;
+}
+
 export interface SelectedCoin {
   userId: string;
   exchangeName: string;
@@ -54,6 +72,7 @@ export class DatabaseService {
     exchangeKeys: Record<string, UserExchangeKeys>;
     securitySettings: Record<string, UserSecuritySettings>;
     riskSettings: Record<string, UserRiskSettings>;
+    userSettings: Record<string, UserSettings>;
     selectedCoins: Record<string, SelectedCoin>;
     paperTrades: Record<string, any>;
   } = {
@@ -61,6 +80,7 @@ export class DatabaseService {
     exchangeKeys: {},
     securitySettings: {},
     riskSettings: {},
+    userSettings: {},
     selectedCoins: {},
     paperTrades: {}
   };
@@ -82,7 +102,6 @@ export class DatabaseService {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }
 
-      // Try dynamically requiring sqlite3 and sqlite to prevent top-level crash if native bindings fail
       const sqlite3 = require('sqlite3');
       const { open } = require('sqlite');
 
@@ -128,6 +147,24 @@ export class DatabaseService {
           updatedAt INTEGER
         );
 
+        CREATE TABLE IF NOT EXISTS user_settings (
+          userId TEXT PRIMARY KEY,
+          totalCapitalUsdt REAL,
+          tradeAmountUsdt REAL,
+          entryPrice REAL,
+          exitPrice REAL,
+          stopLossPricePct REAL,
+          takeProfitPricePct REAL,
+          maxDailyLossPct REAL,
+          maxDailyTrades INTEGER,
+          maxOpenPositions INTEGER,
+          tradingMode TEXT,
+          selectedExchange TEXT,
+          isPaperTrading INTEGER,
+          stopLossRequired INTEGER,
+          updatedAt INTEGER
+        );
+
         CREATE TABLE IF NOT EXISTS selected_coins (
           userId TEXT,
           exchangeName TEXT,
@@ -153,7 +190,7 @@ export class DatabaseService {
       `);
       console.log('SQLite database initialized successfully.');
     } catch (error: any) {
-      console.warn('SQLite native driver unavailable or failed. Switching to JSON file fallback persistence:', error.message);
+      console.warn('SQLite native driver unavailable. Using JSON file fallback:', error.message);
       this.isFallback = true;
       this.loadFallback();
     } finally {
@@ -306,7 +343,96 @@ export class DatabaseService {
     return row ? row.isKillSwitchActive === 1 : false;
   }
 
-  // Risk Settings
+  // User Settings (Capital, Prices, Limits)
+  async saveUserSettings(userId: string, settings: Partial<UserSettings>): Promise<UserSettings> {
+    const current = await this.getUserSettings(userId);
+    const updated: UserSettings = { ...current, ...settings, userId, updatedAt: Date.now() };
+
+    if (this.isFallback) {
+      this.memoryDb.userSettings[userId] = updated;
+      this.saveFallback();
+      return updated;
+    }
+
+    await this.db?.run(
+      `INSERT INTO user_settings (userId, totalCapitalUsdt, tradeAmountUsdt, entryPrice, exitPrice, stopLossPricePct, takeProfitPricePct, maxDailyLossPct, maxDailyTrades, maxOpenPositions, tradingMode, selectedExchange, isPaperTrading, stopLossRequired, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(userId) DO UPDATE SET
+       totalCapitalUsdt=excluded.totalCapitalUsdt, tradeAmountUsdt=excluded.tradeAmountUsdt,
+       entryPrice=excluded.entryPrice, exitPrice=excluded.exitPrice,
+       stopLossPricePct=excluded.stopLossPricePct, takeProfitPricePct=excluded.takeProfitPricePct,
+       maxDailyLossPct=excluded.maxDailyLossPct, maxDailyTrades=excluded.maxDailyTrades,
+       maxOpenPositions=excluded.maxOpenPositions, tradingMode=excluded.tradingMode,
+       selectedExchange=excluded.selectedExchange, isPaperTrading=excluded.isPaperTrading,
+       stopLossRequired=excluded.stopLossRequired, updatedAt=excluded.updatedAt`,
+      [
+        userId, updated.totalCapitalUsdt, updated.tradeAmountUsdt,
+        updated.entryPrice || null, updated.exitPrice || null,
+        updated.stopLossPricePct, updated.takeProfitPricePct,
+        updated.maxDailyLossPct, updated.maxDailyTrades, updated.maxOpenPositions,
+        updated.tradingMode, updated.selectedExchange, updated.isPaperTrading ? 1 : 0,
+        updated.stopLossRequired ? 1 : 0, updated.updatedAt
+      ]
+    );
+    return updated;
+  }
+
+  async getUserSettings(userId: string): Promise<UserSettings> {
+    if (this.isFallback) {
+      return this.memoryDb.userSettings[userId] || {
+        userId,
+        totalCapitalUsdt: 1000.0,
+        tradeAmountUsdt: 100.0,
+        stopLossPricePct: 2.0,
+        takeProfitPricePct: 4.0,
+        maxDailyLossPct: 1.0,
+        maxDailyTrades: 5,
+        maxOpenPositions: 3,
+        tradingMode: 'AUTOMATED_AI',
+        selectedExchange: 'binance',
+        isPaperTrading: true,
+        stopLossRequired: true,
+        updatedAt: Date.now()
+      };
+    }
+    const row = await this.db?.get('SELECT * FROM user_settings WHERE userId = ?', [userId]);
+    if (row) {
+      return {
+        userId: row.userId,
+        totalCapitalUsdt: row.totalCapitalUsdt,
+        tradeAmountUsdt: row.tradeAmountUsdt,
+        entryPrice: row.entryPrice || undefined,
+        exitPrice: row.exitPrice || undefined,
+        stopLossPricePct: row.stopLossPricePct,
+        takeProfitPricePct: row.takeProfitPricePct,
+        maxDailyLossPct: row.maxDailyLossPct,
+        maxDailyTrades: row.maxDailyTrades,
+        maxOpenPositions: row.maxOpenPositions,
+        tradingMode: row.tradingMode,
+        selectedExchange: row.selectedExchange,
+        isPaperTrading: row.isPaperTrading === 1,
+        stopLossRequired: row.stopLossRequired === 1,
+        updatedAt: row.updatedAt
+      };
+    }
+    return {
+      userId,
+      totalCapitalUsdt: 1000.0,
+      tradeAmountUsdt: 100.0,
+      stopLossPricePct: 2.0,
+      takeProfitPricePct: 4.0,
+      maxDailyLossPct: 1.0,
+      maxDailyTrades: 5,
+      maxOpenPositions: 3,
+      tradingMode: 'AUTOMATED_AI',
+      selectedExchange: 'binance',
+      isPaperTrading: true,
+      stopLossRequired: true,
+      updatedAt: Date.now()
+    };
+  }
+
+  // Risk Settings (Legacy wrapper)
   async saveRiskSettings(userId: string, settings: Partial<UserRiskSettings>): Promise<UserRiskSettings> {
     const current = await this.getRiskSettings(userId);
     const updated = { ...current, ...settings, updatedAt: Date.now() };

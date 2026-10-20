@@ -35,7 +35,6 @@ export class ExchangeController {
       const selectedExchange = (exchangeName || 'binance').toLowerCase();
       const adapter = getAdapter(selectedExchange);
 
-      // Test keys with real exchange before saving
       const status = await adapter.validateKeys(apiKey.trim(), apiSecret.trim());
       if (!status.isConnected) {
         res.status(400).json({
@@ -55,7 +54,6 @@ export class ExchangeController {
         return;
       }
 
-      // Encrypt secrets using AES-256-GCM
       const encryptedKey = CryptoService.encrypt(apiKey.trim());
       const encryptedSecret = CryptoService.encrypt(apiSecret.trim());
 
@@ -129,6 +127,20 @@ export class ExchangeController {
       const status = await adapter.validateKeys(apiKey, apiSecret);
 
       res.json({ success: true, data: status, message: 'تم جلب حالة الاتصال الحقيقية' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
+  static async getPaperTrades(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const openTrades = await db.getOpenPaperTrades(userId);
+      res.json({
+        success: true,
+        data: openTrades,
+        message: 'تم جلب الصفقات الافتراضية بنجاح'
+      });
     } catch (error: any) {
       res.status(500).json({ success: false, data: null, message: error.message });
     }

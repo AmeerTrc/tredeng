@@ -64,4 +64,25 @@ export class SecurityController {
       res.status(500).json({ success: false, data: null, message: error.message });
     }
   }
+
+  static async getUserSettings(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const settings = await db.getUserSettings(userId);
+      res.json({ success: true, data: settings, message: 'تم تحميل الإعدادات والمبالغ بنجاح' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
+  static async saveUserSettings(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const settingsToSave = req.body;
+      const updated = await db.saveUserSettings(userId, settingsToSave);
+      res.json({ success: true, data: updated, message: 'تم حفظ جميع الإعدادات والمبالغ يدوياً بنجاح' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
 }

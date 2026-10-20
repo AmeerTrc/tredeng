@@ -2,19 +2,13 @@ import { GeminiService } from '../ai/geminiService';
 import { BinanceAdapter } from '../exchange/binanceAdapter';
 import { OkxAdapter } from '../exchange/okxAdapter';
 import { BybitAdapter } from '../exchange/bybitAdapter';
-import { ServerRiskEngine } from '../risk/serverRiskEngine';
+import { ServerRiskEngine, TradeSignal } from '../risk/serverRiskEngine';
 import { DatabaseService } from '../storage/databaseService';
 
 const db = DatabaseService.getInstance();
 const gemini = new GeminiService();
 
 export class PaperTradingEngine {
-  static async evaluateUserPortfolios(): Promise<void> {
-    console.log("[Paper Trading Engine] Running market evaluation cycle...");
-    // For every user (in a real app, you'd iterate over all active users)
-    // We will get all users from DB or run for a demo cycle.
-  }
-
   static async runCycleForUser(userId: string, exchangeName: string = 'binance'): Promise<void> {
     const isKillSwitch = await db.isKillSwitchActive(userId);
     if (isKillSwitch) {
@@ -22,37 +16,74 @@ export class PaperTradingEngine {
       return;
     }
 
-    const selectedCoins = await db.getSelectedCoins(userId, exchangeName);
+    const userSettings = await db.getUserSettings(userId);
+    const selectedCoins = await db.getSelectedCoins(userId, userSettings.selectedExchange || exchangeName);
+
     if (selectedCoins.length === 0) {
-      console.log(`[Paper Trading] No coins selected for user ${userId} on ${exchangeName}.`);
+      console.log(`[Paper Trading] No coins selected for user ${userId} on ${userSettings.selectedExchange}.`);
       return;
     }
 
     let adapter: any = new BinanceAdapter();
-    if (exchangeName === 'okx') adapter = new OkxAdapter();
-    if (exchangeName === 'bybit') adapter = new BybitAdapter();
+    if (userSettings.selectedExchange === 'okx') adapter = new OkxAdapter();
+    if (userSettings.selectedExchange === 'bybit') adapter = new BybitAdapter();
+
+    const openTrades = await db.getOpenPaperTrades(userId);
+    if (openTrades.length >= userSettings.maxOpenPositions) {
+      console.log(`[Paper Trading] Maximum open positions (${userSettings.maxOpenPositions}) reached for user ${userId}.`);
+      return;
+    }
 
     for (const coin of selectedCoins) {
       try {
         const ticker = await adapter.getTicker(coin.symbol);
+        let signal: TradeSignal;
 
-        // 1. Analyze with Gemini AI
-        const signal = await gemini.analyzeMarket({
-          symbol: ticker.symbol,
-          price: ticker.price,
-          high24h: ticker.high24h,
-          low24h: ticker.low24h,
-          volume24h: ticker.volume24h,
-          priceChangePercent: ticker.priceChangePercent
-        });
+        if (userSettings.tradingMode === 'MANUAL') {
+          // Manual Target Price Evaluation
+          const entryPrice = userSettings.entryPrice;
+          const isTargetReached = entryPrice ? ticker.price <= entryPrice : true;
+          const action = isTargetReached ? 'BUY' : 'HOLD';
 
-        console.log(`[AI Signal] ${coin.symbol}: ${signal.action} (Confidence: ${signal.confidence}) - ${signal.reason}`);
+          const stopLoss = ticker.price * (1 - (userSettings.stopLossPricePct / 100));
+          const takeProfit = userSettings.exitPrice || (ticker.price * (1 + (userSettings.takeProfitPricePct / 100)));
 
-        // 2. Validate with Risk Engine
-        const openTrades = await db.getOpenPaperTrades(userId);
+          signal = {
+            action: action,
+            symbol: coin.symbol,
+            confidence: 1.0,
+            entryPrice: ticker.price,
+            stopLoss: stopLoss,
+            takeProfit: takeProfit,
+            positionSize: userSettings.tradeAmountUsdt,
+            riskRewardRatio: 2.0,
+            reason: isTargetReached
+              ? `تم الوصول لسعر الشراء المني المترقب ($${entryPrice || ticker.price})`
+              : `السعر الحقيقي ($${ticker.price}) أعلى من سعر الشراء المترقب ($${entryPrice})`
+          };
+        } else {
+          // Automated AI Analysis via Gemini
+          signal = await gemini.analyzeMarket({
+            symbol: ticker.symbol,
+            price: ticker.price,
+            high24h: ticker.high24h,
+            low24h: ticker.low24h,
+            volume24h: ticker.volume24h,
+            priceChangePercent: ticker.priceChangePercent
+          });
+
+          // Override SL/TP with user's explicit risk rules if specified
+          signal.stopLoss = ticker.price * (1 - (userSettings.stopLossPricePct / 100));
+          signal.takeProfit = ticker.price * (1 + (userSettings.takeProfitPricePct / 100));
+          signal.positionSize = userSettings.tradeAmountUsdt;
+        }
+
+        console.log(`[Trade Signal - ${userSettings.tradingMode}] ${coin.symbol}: ${signal.action} - ${signal.reason}`);
+
+        // Validate via Server Risk Engine
         const riskCheck = ServerRiskEngine.validateTradeSignal(
           signal,
-          1000.0, // Mock paper portfolio balance 1000 USDT
+          userSettings.totalCapitalUsdt,
           0.0,
           0,
           isKillSwitch,
@@ -60,20 +91,19 @@ export class PaperTradingEngine {
         );
 
         if (riskCheck.isAllowed && signal.action !== 'HOLD') {
-          // Record Paper Trade
           const tradeId = await db.recordPaperTrade(
             userId,
-            exchangeName,
+            userSettings.selectedExchange,
             coin.symbol,
             signal.action,
             ticker.price,
-            10.0, // Default $10 allocation for paper trading
+            userSettings.tradeAmountUsdt,
             signal.stopLoss,
             signal.takeProfit
           );
-          console.log(`[Paper Trade Executed] ID: ${tradeId} | ${signal.action} ${coin.symbol} @ $${ticker.price}`);
+          console.log(`[Paper Trade Executed] ID: ${tradeId} | ${signal.action} ${coin.symbol} @ $${ticker.price} | Amount: $${userSettings.tradeAmountUsdt}`);
         } else {
-          console.log(`[Paper Trade Rejected] Reason: ${riskCheck.rejectionReason || 'HOLD or Invalid signal'}`);
+          console.log(`[Paper Trade Filtered] Reason: ${riskCheck.rejectionReason || 'HOLD or Invalid signal'}`);
         }
 
       } catch (err: any) {
