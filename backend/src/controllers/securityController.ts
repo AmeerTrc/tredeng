@@ -1,25 +1,46 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import { DatabaseService } from '../services/storage/databaseService';
 
-let isKillSwitchActive = false;
+const db = DatabaseService.getInstance();
 
 export class SecurityController {
   static async toggleKillSwitch(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      const userId = req.userId!;
       const { active } = req.body;
-      isKillSwitchActive = Boolean(active);
+      const isKillSwitchActive = Boolean(active);
+
+      db.setKillSwitch(userId, isKillSwitchActive);
 
       res.json({
         success: true,
         data: isKillSwitchActive,
-        message: isKillSwitchActive ? 'تم تفعيل زر الطوارئ بنجاح وإيقاف الصفقات' : 'تم إلغاء زر الطوارئ'
+        message: isKillSwitchActive
+          ? 'تم تفعيل زر الطوارئ بنجاح وإيقاف الصفقات فورياً'
+          : 'تم إلغاء زر الطوارئ والعودة للوضع الطبيعي'
       });
     } catch (error: any) {
       res.status(500).json({ success: false, data: null, message: error.message });
     }
   }
 
-  static isKillSwitchOn(): boolean {
-    return isKillSwitchActive;
+  static async getKillSwitchStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const isKillSwitchActive = db.isKillSwitchActive(userId);
+
+      res.json({
+        success: true,
+        data: isKillSwitchActive,
+        message: 'تم جلب حالة زر الطوارئ'
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
+  static isKillSwitchOn(userId: string): boolean {
+    return db.isKillSwitchActive(userId);
   }
 }

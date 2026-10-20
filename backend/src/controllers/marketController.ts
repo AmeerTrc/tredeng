@@ -5,7 +5,8 @@ import { ExnessAdapter } from '../services/exchange/exnessAdapter';
 export class MarketController {
   static async getTicker(req: Request, res: Response): Promise<void> {
     try {
-      const symbol = (req.params.symbol || 'BTCUSDT').toUpperCase();
+      const rawSymbol = Array.isArray(req.params.symbol) ? req.params.symbol[0] : req.params.symbol;
+      const symbol = (rawSymbol || 'BTCUSDT').toUpperCase();
       const adapter = symbol.includes('XAU') ? new ExnessAdapter() : new BinanceAdapter();
       const ticker = await adapter.getTicker(symbol);
 

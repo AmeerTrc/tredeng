@@ -2,38 +2,48 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { ENV } from '../config/env';
+import { DatabaseService } from '../services/storage/databaseService';
 
-// In-Memory store for users (Mock DB for instant standalone testing, upgradable to Postgres pool)
-const usersStore = new Map<string, { id: string; email: string; passwordHash: string }>();
+const db = DatabaseService.getInstance();
 
 export class AuthController {
   static async register(req: Request, res: Response): Promise<void> {
     try {
-      const { email, passwordHash } = req.body;
+      const email = req.body.email?.trim().toLowerCase();
+      const password = req.body.password || req.body.passwordHash;
 
-      if (!email || !passwordHash) {
-        res.status(400).json({ success: false, data: null, message: 'البريد وكلمة المرور مطلوبان' });
+      if (!email || !password) {
+        res.status(400).json({ success: false, data: null, message: 'البريد الإلكتروني وكلمة المرور مطلوبان' });
         return;
       }
 
-      const existingUser = Array.from(usersStore.values()).find(u => u.email === email);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        res.status(400).json({ success: false, data: null, message: 'صيغة البريد الإلكتروني غير صحيحة' });
+        return;
+      }
+
+      if (password.length < 6) {
+        res.status(400).json({ success: false, data: null, message: 'كلمة المرور يجب أن لا تقل عن 6 أحرف' });
+        return;
+      }
+
+      const existingUser = db.getUserByEmail(email);
       if (existingUser) {
         res.status(400).json({ success: false, data: null, message: 'البريد الإلكتروني مستخدم بالفعل' });
         return;
       }
 
-      const userId = `usr_${Date.now()}`;
-      const hashed = await bcrypt.hash(passwordHash, 10);
-      usersStore.set(userId, { id: userId, email, passwordHash: hashed });
+      const hashed = await bcrypt.hash(password, 10);
+      const user = db.createUser(email, hashed);
 
-      const token = jwt.sign({ userId, email }, ENV.JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ userId: user.id, email: user.email }, ENV.JWT_SECRET, { expiresIn: '7d' });
 
-      res.json({
+      res.status(201).json({
         success: true,
         data: {
           token,
-          userId,
-          email,
+          userId: user.id,
+          email: user.email,
           message: 'تم إنشاء الحساب بنجاح'
         },
         message: 'تم التسجيل بنجاح'
@@ -45,20 +55,24 @@ export class AuthController {
 
   static async login(req: Request, res: Response): Promise<void> {
     try {
-      const { email, passwordHash } = req.body;
+      const email = req.body.email?.trim().toLowerCase();
+      const password = req.body.password || req.body.passwordHash;
 
-      if (!email || !passwordHash) {
-        res.status(400).json({ success: false, data: null, message: 'بيانات غير مكتملة' });
+      if (!email || !password) {
+        res.status(400).json({ success: false, data: null, message: 'البريد الإلكتروني وكلمة المرور مطلوبان' });
         return;
       }
 
-      let user = Array.from(usersStore.values()).find(u => u.email === email);
+      const user = db.getUserByEmail(email);
       if (!user) {
-        // Auto-create dev user if testing for smooth DX
-        const userId = `usr_${Date.now()}`;
-        const hashed = await bcrypt.hash(passwordHash, 10);
-        user = { id: userId, email, passwordHash: hashed };
-        usersStore.set(userId, user);
+        res.status(401).json({ success: false, data: null, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+        return;
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isPasswordValid) {
+        res.status(401).json({ success: false, data: null, message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+        return;
       }
 
       const token = jwt.sign({ userId: user.id, email: user.email }, ENV.JWT_SECRET, { expiresIn: '7d' });

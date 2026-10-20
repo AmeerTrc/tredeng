@@ -100,16 +100,8 @@ export class BinanceAdapter implements ExchangeAdapter {
         balances
       };
     } catch (error: any) {
-      console.warn('Binance Account call fallback to mock portfolio for dev/test:', error.message);
-      return {
-        totalBalanceUsdt: 1250.00,
-        availableBalanceUsdt: 1000.00,
-        inOrdersUsdt: 250.00,
-        balances: [
-          { asset: 'USDT', free: 1000.00, locked: 0, total: 1000.00 },
-          { asset: 'BTC', free: 0.0038, locked: 0, total: 0.0038 }
-        ]
-      };
+      const errDetails = error.response?.data?.msg || error.message;
+      throw new Error(`فشل جلب رصيد الحساب من Binance: ${errDetails}`);
     }
   }
 
@@ -129,16 +121,8 @@ export class BinanceAdapter implements ExchangeAdapter {
         timestamp: Date.now()
       };
     } catch (error: any) {
-      console.warn('Binance Ticker call fallback for dev:', error.message);
-      return {
-        symbol,
-        price: 65420.50,
-        high24h: 66800.00,
-        low24h: 64200.00,
-        volume24h: 18450.25,
-        priceChangePercent: 2.15,
-        timestamp: Date.now()
-      };
+      const errDetails = error.response?.data?.msg || error.message;
+      throw new Error(`فشل جلب سعر زوج ${symbol} اللحظي من Binance: ${errDetails}`);
     }
   }
 }

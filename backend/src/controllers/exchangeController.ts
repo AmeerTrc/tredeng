@@ -1,11 +1,10 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
-import { CryptoService, EncryptedData } from '../services/cryptoService';
+import { CryptoService } from '../services/cryptoService';
 import { BinanceAdapter } from '../services/exchange/binanceAdapter';
-import { ExnessAdapter } from '../services/exchange/exnessAdapter';
+import { DatabaseService } from '../services/storage/databaseService';
 
-// In-memory store for encrypted keys per user
-const userKeysStore = new Map<string, { exchangeName: string; apiKeyEncrypted: EncryptedData; apiSecretEncrypted: EncryptedData }>();
+const db = DatabaseService.getInstance();
 
 export class ExchangeController {
   static async saveKeys(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -18,23 +17,44 @@ export class ExchangeController {
         return;
       }
 
+      if (apiKey.trim().length < 16 || apiSecret.trim().length < 16) {
+        res.status(400).json({ success: false, data: null, message: 'طول مفاتيح API غير صالح' });
+        return;
+      }
+
+      const selectedExchange = (exchangeName || 'binance').toLowerCase();
+      const adapter = new BinanceAdapter();
+
+      // Test keys with real exchange before saving
+      const status = await adapter.validateKeys(apiKey.trim(), apiSecret.trim());
+      if (!status.isConnected) {
+        res.status(400).json({
+          success: false,
+          data: status,
+          message: 'فشل التحقق من مفاتيح API لدى المنصة. تأكد من صحة المفاتيح وصلاحية Spot Trading.'
+        });
+        return;
+      }
+
+      if (status.canWithdraw) {
+        res.status(400).json({
+          success: false,
+          data: null,
+          message: 'تحذير أمان: تم رفض المفتاح لوجود صلاحية السحب (Withdrawals). يرجى إنشاء مفتاح مخصص للتداول فقط دون سحب.'
+        });
+        return;
+      }
+
       // Encrypt secrets using AES-256-GCM
-      const encryptedKey = CryptoService.encrypt(apiKey);
-      const encryptedSecret = CryptoService.encrypt(apiSecret);
+      const encryptedKey = CryptoService.encrypt(apiKey.trim());
+      const encryptedSecret = CryptoService.encrypt(apiSecret.trim());
 
-      userKeysStore.set(userId, {
-        exchangeName: exchangeName || 'binance',
-        apiKeyEncrypted: encryptedKey,
-        apiSecretEncrypted: encryptedSecret
-      });
-
-      const adapter = exchangeName?.toLowerCase().includes('exness') ? new ExnessAdapter() : new BinanceAdapter();
-      const status = await adapter.validateKeys(apiKey, apiSecret);
+      db.saveExchangeKeys(userId, selectedExchange, encryptedKey, encryptedSecret);
 
       res.json({
         success: true,
         data: status,
-        message: 'تم حفظ مفاتيح API بنجاح وتشفيرها بـ AES-256-GCM'
+        message: 'تم حفظ وتشفير مفاتيح API بنجاح بعد التحقق منها'
       });
     } catch (error: any) {
       res.status(500).json({ success: false, data: null, message: error.message });
@@ -44,25 +64,27 @@ export class ExchangeController {
   static async getBalance(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const userKeyInfo = userKeysStore.get(userId);
+      const userKeyInfo = db.getExchangeKeys(userId);
 
-      let apiKey = 'MOCK_API_KEY';
-      let apiSecret = 'MOCK_API_SECRET';
-      let exchangeName = 'binance';
-
-      if (userKeyInfo) {
-        apiKey = CryptoService.decrypt(userKeyInfo.apiKeyEncrypted);
-        apiSecret = CryptoService.decrypt(userKeyInfo.apiSecretEncrypted);
-        exchangeName = userKeyInfo.exchangeName;
+      if (!userKeyInfo) {
+        res.status(400).json({
+          success: false,
+          data: null,
+          message: 'لم يتم ربط مفاتيح المنصة بعد. يرجى إدخال مفاتيح API أولاً.'
+        });
+        return;
       }
 
-      const adapter = exchangeName.toLowerCase().includes('exness') ? new ExnessAdapter() : new BinanceAdapter();
+      const apiKey = CryptoService.decrypt(userKeyInfo.apiKeyEncrypted);
+      const apiSecret = CryptoService.decrypt(userKeyInfo.apiSecretEncrypted);
+
+      const adapter = new BinanceAdapter();
       const portfolio = await adapter.getPortfolio(apiKey, apiSecret);
 
       res.json({
         success: true,
         data: portfolio,
-        message: 'تم جلب الرصيد بنجاح'
+        message: 'تم جلب الرصيد الحقيقي بنجاح'
       });
     } catch (error: any) {
       res.status(500).json({ success: false, data: null, message: error.message });
@@ -72,7 +94,7 @@ export class ExchangeController {
   static async getStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const userKeyInfo = userKeysStore.get(userId);
+      const userKeyInfo = db.getExchangeKeys(userId);
 
       if (!userKeyInfo) {
         res.json({
@@ -85,7 +107,7 @@ export class ExchangeController {
             canTradeSpot: false,
             canWithdraw: false
           },
-          message: 'لم يتم تكوين المفاتيح بعد'
+          message: 'لم يتم ربط المفاتيح بعد'
         });
         return;
       }
@@ -93,10 +115,10 @@ export class ExchangeController {
       const apiKey = CryptoService.decrypt(userKeyInfo.apiKeyEncrypted);
       const apiSecret = CryptoService.decrypt(userKeyInfo.apiSecretEncrypted);
 
-      const adapter = userKeyInfo.exchangeName.toLowerCase().includes('exness') ? new ExnessAdapter() : new BinanceAdapter();
+      const adapter = new BinanceAdapter();
       const status = await adapter.validateKeys(apiKey, apiSecret);
 
-      res.json({ success: true, data: status, message: 'تم جلب حالة الاتصال' });
+      res.json({ success: true, data: status, message: 'تم جلب حالة الاتصال الحقيقية' });
     } catch (error: any) {
       res.status(500).json({ success: false, data: null, message: error.message });
     }
