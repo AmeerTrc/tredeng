@@ -38,4 +38,28 @@ interface TredeigApiService {
         @Header("Authorization") token: String,
         @Body request: KillSwitchRequest
     ): Response<ApiResponse<Boolean>>
+
+    @GET("api/security/risk")
+    suspend fun getRiskSettings(
+        @Header("Authorization") token: String
+    ): Response<ApiResponse<RiskSettingsDto>>
+
+    @POST("api/security/risk")
+    suspend fun saveRiskSettings(
+        @Header("Authorization") token: String,
+        @Body request: RiskSettingsDto
+    ): Response<ApiResponse<RiskSettingsDto>>
+
+    @GET("api/market/coins/{exchangeName}")
+    suspend fun getSelectedCoins(
+        @Header("Authorization") token: String,
+        @Path("exchangeName") exchangeName: String
+    ): Response<ApiResponse<List<SelectedCoinDto>>>
+
+    @POST("api/market/coins/{exchangeName}")
+    suspend fun saveSelectedCoin(
+        @Header("Authorization") token: String,
+        @Path("exchangeName") exchangeName: String,
+        @Body request: SaveSelectedCoinRequest
+    ): Response<ApiResponse<Any>>
 }

@@ -5,6 +5,9 @@ import com.tredeig.app.core.security.EncryptedStorage
 import com.tredeig.app.data.remote.api.ApiClient
 import com.tredeig.app.data.remote.dto.KillSwitchRequest
 import com.tredeig.app.data.remote.dto.SaveExchangeKeysRequest
+import com.tredeig.app.data.remote.dto.RiskSettingsDto
+import com.tredeig.app.data.remote.dto.SelectedCoinDto
+import com.tredeig.app.data.remote.dto.SaveSelectedCoinRequest
 import com.tredeig.app.domain.model.AccountBalance
 import com.tredeig.app.domain.model.ExchangeKeyInfo
 import com.tredeig.app.domain.model.PortfolioSummary
@@ -74,6 +77,58 @@ class ExchangeRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
                 Resource.Success(response.body()!!.data ?: active)
             } else {
                 Resource.Error(response.body()?.message ?: "فشل تغيير حالة زر الطوارئ")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun getRiskSettings(): Resource<RiskSettingsDto> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.getRiskSettings(getAuthHeader())
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(response.body()!!.data!!)
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل جلب إعدادات المخاطر")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun saveRiskSettings(settings: RiskSettingsDto): Resource<RiskSettingsDto> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.saveRiskSettings(getAuthHeader(), settings)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(response.body()!!.data!!)
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل حفظ إعدادات المخاطر")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun getSelectedCoins(exchangeName: String = "binance"): Resource<List<SelectedCoinDto>> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.getSelectedCoins(getAuthHeader(), exchangeName)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(response.body()!!.data ?: emptyList())
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل جلب العملات")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun saveSelectedCoin(exchangeName: String = "binance", symbol: String, isActive: Boolean): Resource<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.saveSelectedCoin(getAuthHeader(), exchangeName, SaveSelectedCoinRequest(symbol, isActive))
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(Unit)
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل حفظ العملة")
             }
         } catch (e: Exception) {
             Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")

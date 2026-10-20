@@ -27,7 +27,7 @@ export class MarketController {
   static async getSelectedCoins(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const exchangeName = req.params.exchangeName || 'binance';
+      const exchangeName = (req.params.exchangeName as string) || 'binance';
       const coins = await db.getSelectedCoins(userId, exchangeName);
       res.json({ success: true, data: coins, message: 'Selected coins loaded' });
     } catch (error: any) {
@@ -38,7 +38,7 @@ export class MarketController {
   static async saveSelectedCoin(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const exchangeName = req.params.exchangeName || 'binance';
+      const exchangeName = (req.params.exchangeName as string) || 'binance';
       const { symbol, isActive } = req.body;
 
       if (!symbol) {

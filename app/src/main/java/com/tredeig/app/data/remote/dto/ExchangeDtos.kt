@@ -34,6 +34,24 @@ data class KillSwitchRequest(
     val closePositionsHandledManually: Boolean = true
 )
 
+data class RiskSettingsDto(
+    val maxTradeRiskPct: Double,
+    val maxDailyLossPct: Double,
+    val minConfidence: Double,
+    val maxDailyTrades: Int,
+    val stopLossRequired: Boolean
+)
+
+data class SelectedCoinDto(
+    val symbol: String,
+    val isActive: Boolean
+)
+
+data class SaveSelectedCoinRequest(
+    val symbol: String,
+    val isActive: Boolean
+)
+
 data class ApiResponse<T>(
     val success: Boolean,
     val data: T?,
