@@ -125,4 +125,19 @@ export class BinanceAdapter implements ExchangeAdapter {
       throw new Error(`فشل جلب سعر زوج ${symbol} اللحظي من Binance: ${errDetails}`);
     }
   }
+
+  async getAvailableSymbols(): Promise<string[]> {
+    try {
+      const response = await axios.get(`${ENV.BINANCE_BASE_URL}/api/v3/exchangeInfo`, {
+        timeout: 8000
+      });
+      // Return only SPOT trading pairs that are trading
+      const symbols = response.data.symbols
+        .filter((s: any) => s.status === 'TRADING' && s.isSpotTradingAllowed)
+        .map((s: any) => s.symbol);
+      return symbols;
+    } catch (error: any) {
+      throw new Error(`فشل جلب أزواج التداول من Binance: ${error.message}`);
+    }
+  }
 }

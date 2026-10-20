@@ -24,6 +24,23 @@ export class MarketController {
     }
   }
 
+  static async getAvailableSymbols(req: Request, res: Response): Promise<void> {
+    try {
+      const exchangeNameStr = (req.params.exchangeName as string) || 'binance';
+      const exchangeName = exchangeNameStr.toLowerCase();
+      const adapter = exchangeName === 'exness' ? new ExnessAdapter() : new BinanceAdapter();
+      const symbols = await adapter.getAvailableSymbols();
+
+      res.json({
+        success: true,
+        data: symbols,
+        message: 'تم جلب أزواج التداول المتاحة بنجاح'
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
   static async getSelectedCoins(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;

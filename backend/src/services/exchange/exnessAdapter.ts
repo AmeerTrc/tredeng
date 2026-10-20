@@ -38,4 +38,8 @@ export class ExnessAdapter implements ExchangeAdapter {
       timestamp: Date.now()
     };
   }
+
+  async getAvailableSymbols(): Promise<string[]> {
+    return ['XAUUSD', 'XAGUSD', 'EURUSD', 'GBPUSD'];
+  }
 }
