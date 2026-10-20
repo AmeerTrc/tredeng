@@ -9,8 +9,6 @@ export interface MarketDataSnapshot {
   low24h: number;
   volume24h: number;
   priceChangePercent: number;
-  // In a real app, this would also contain historical OHLCV data for RSI/MACD calculations
-  // For now, we will pass the 24h ticker data to simulate market context.
 }
 
 export class GeminiService {
@@ -23,12 +21,12 @@ export class GeminiService {
   }
 
   async analyzeMarket(snapshot: MarketDataSnapshot): Promise<TradeSignal> {
-    if (!this.genAI) {
-      console.warn("GEMINI_API_KEY is not set. Using fallback mock analysis.");
-      return this.getMockAnalysis(snapshot);
+    if (!this.genAI || !ENV.GEMINI_API_KEY) {
+      throw new Error("خطأ: مفتاح GEMINI_API_KEY غير مكوّن في الخادم. تعذر إجراء تحليل الذكاء الاصطناعي.");
     }
 
     try {
+      // Using gemini-1.5-flash (fast and supported on standard Gemini API keys)
       const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const prompt = `
@@ -57,36 +55,25 @@ export class GeminiService {
 
       const parsed = JSON.parse(text);
 
+      if (!parsed.action || !['BUY', 'SELL', 'HOLD'].includes(parsed.action)) {
+        throw new Error("استجابة غير صالحة من نموذج Gemini (صيغة القرار غير معروفة).");
+      }
+
       return {
-        action: parsed.action || 'HOLD',
+        action: parsed.action,
         symbol: snapshot.symbol,
-        confidence: parsed.confidence || 0.5,
+        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
         entryPrice: snapshot.price,
-        stopLoss: parsed.stopLoss || snapshot.price * 0.98,
-        takeProfit: parsed.takeProfit || snapshot.price * 1.02,
-        positionSize: 0, // Calculated later by Risk Engine
-        riskRewardRatio: parsed.riskRewardRatio || 2.0,
-        reason: parsed.reason || 'No reason provided by AI.'
+        stopLoss: typeof parsed.stopLoss === 'number' ? parsed.stopLoss : snapshot.price * 0.98,
+        takeProfit: typeof parsed.takeProfit === 'number' ? parsed.takeProfit : snapshot.price * 1.02,
+        positionSize: 0,
+        riskRewardRatio: typeof parsed.riskRewardRatio === 'number' ? parsed.riskRewardRatio : 2.0,
+        reason: parsed.reason || 'لم يتم تقديم سبب من الذكاء الاصطناعي.'
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Gemini AI Analysis Error:", error);
-      return this.getMockAnalysis(snapshot);
+      throw new Error(`فشل تحليل الذكاء الاصطناعي (Gemini Error): ${error.message}`);
     }
-  }
-
-  private getMockAnalysis(snapshot: MarketDataSnapshot): TradeSignal {
-    const isUptrend = snapshot.priceChangePercent > 0;
-    return {
-      action: isUptrend ? 'BUY' : 'HOLD',
-      symbol: snapshot.symbol,
-      confidence: 0.75,
-      entryPrice: snapshot.price,
-      stopLoss: snapshot.price * 0.98,
-      takeProfit: snapshot.price * 1.02,
-      positionSize: 0,
-      riskRewardRatio: 2.0,
-      reason: 'تحليل افتراضي: السوق في مسار صاعد (التكامل مع Gemini بانتظار مفتاح API)'
-    };
   }
 }

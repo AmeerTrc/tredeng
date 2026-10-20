@@ -30,9 +30,9 @@ app.get('/', (req, res) => {
 
 // Init DB and Start Server
 DatabaseService.getInstance().init().then(() => {
-  app.listen(ENV.PORT, () => {
+  app.listen(ENV.PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
-    console.log(` Tredeig Backend running on http://localhost:${ENV.PORT}`);
+    console.log(` Tredeig Backend running on port ${ENV.PORT}`);
     console.log(` Phase 2 active: Database initialized. Independent Exchanges + Live Settings.`);
     console.log(`=======================================================`);
   });

@@ -7,8 +7,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    // Default to local backend IP / Android Emulator 10.0.2.2 or localhost
-    private const val BASE_URL = "http://10.0.2.2:5000/"
+    // Railway Deployed URL (Production) / Fallback to local
+    private var baseUrl: String = "https://tredeng-production.up.railway.app/"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -16,16 +16,32 @@ object ApiClient {
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    val instance: TredeigApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
+    private var retrofitInstance: TredeigApiService? = null
+
+    fun updateBaseUrl(newUrl: String) {
+        val formattedUrl = if (newUrl.endsWith("/")) newUrl else "$newUrl/"
+        baseUrl = formattedUrl
+        retrofitInstance = createApiService(formattedUrl)
+    }
+
+    private fun createApiService(url: String): TredeigApiService {
+        return Retrofit.Builder()
+            .baseUrl(url)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(TredeigApiService::class.java)
     }
+
+    val instance: TredeigApiService
+        get() {
+            if (retrofitInstance == null) {
+                retrofitInstance = createApiService(baseUrl)
+            }
+            return retrofitInstance!!
+        }
 }

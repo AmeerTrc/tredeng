@@ -3,10 +3,12 @@ import { BinanceAdapter } from '../services/exchange/binanceAdapter';
 import { ExnessAdapter } from '../services/exchange/exnessAdapter';
 import { OkxAdapter } from '../services/exchange/okxAdapter';
 import { BybitAdapter } from '../services/exchange/bybitAdapter';
+import { GeminiService } from '../services/ai/geminiService';
 import { DatabaseService } from '../services/storage/databaseService';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
 const db = DatabaseService.getInstance();
+const geminiService = new GeminiService();
 
 export class MarketController {
   static async getTicker(req: Request, res: Response): Promise<void> {
@@ -51,6 +53,36 @@ export class MarketController {
       });
     } catch (error: any) {
       res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
+  static async testGeminiAnalysis(req: Request, res: Response): Promise<void> {
+    try {
+      const rawSymbol = (req.params.symbol as string) || 'BTCUSDT';
+      const symbol = rawSymbol.toUpperCase();
+      const binance = new BinanceAdapter();
+      const ticker = await binance.getTicker(symbol);
+
+      const analysis = await geminiService.analyzeMarket({
+        symbol: ticker.symbol,
+        price: ticker.price,
+        high24h: ticker.high24h,
+        low24h: ticker.low24h,
+        volume24h: ticker.volume24h,
+        priceChangePercent: ticker.priceChangePercent
+      });
+
+      res.json({
+        success: true,
+        data: analysis,
+        message: 'تم إجراء التحليل الحقيقي بنجاح من Gemini API'
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        data: null,
+        message: error.message
+      });
     }
   }
 
