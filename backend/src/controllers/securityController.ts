@@ -43,4 +43,25 @@ export class SecurityController {
   static async isKillSwitchOn(userId: string): Promise<boolean> {
     return await db.isKillSwitchActive(userId);
   }
+
+  static async getRiskSettings(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const settings = await db.getRiskSettings(userId);
+      res.json({ success: true, data: settings, message: 'Risk settings loaded' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
+  static async saveRiskSettings(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const settingsToSave = req.body;
+      const updated = await db.saveRiskSettings(userId, settingsToSave);
+      res.json({ success: true, data: updated, message: 'Risk settings saved' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
 }
