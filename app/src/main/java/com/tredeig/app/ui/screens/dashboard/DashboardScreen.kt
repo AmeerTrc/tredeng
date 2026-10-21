@@ -5,8 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -64,6 +61,7 @@ fun DashboardScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var selectedBottomTab by remember { mutableStateOf(0) }
+    var isExchangeDropdownExpanded by remember { mutableStateOf(false) }
 
     // Live Coins List fetched from Exchange API
     val coinsList = remember(state.ticker) {
@@ -162,7 +160,6 @@ fun DashboardScreen(
     ) {
         Scaffold(
             topBar = {
-                // Header Top Bar: Menu Icon + Tredeng Logo + Notifications Icon
                 TopAppBar(
                     title = {
                         Row(
@@ -215,7 +212,6 @@ fun DashboardScreen(
                 )
             },
             bottomBar = {
-                // Bottom Navigation Bar 1:1 Match with Image
                 NavigationBar(
                     containerColor = CardBg,
                     contentColor = TextPrimary,
@@ -304,7 +300,7 @@ fun DashboardScreen(
             ) {
                 Spacer(modifier = Modifier.height(2.dp))
 
-                // 1. CARD 1: Main Real Balance Card (الرصيد الإجمالي)
+                // 1. CARD 1: Main Real Balance Card (الرصيد الإجمالي الحقيقي)
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CardBg),
                     shape = RoundedCornerShape(20.dp),
@@ -339,7 +335,7 @@ fun DashboardScreen(
                             modifier = Modifier.padding(18.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            // Top Row: Title + Exchange Chip Selector + Refresh Button
+                            // Top Row: Title + Exchange Chip Selector Dropdown + Refresh Button
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -357,28 +353,58 @@ fun DashboardScreen(
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        color = Color.Black.copy(alpha = 0.5f),
-                                        shape = RoundedCornerShape(12.dp),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                                        modifier = Modifier.clickable { onNavigateToExchange() }
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                    Box {
+                                        Surface(
+                                            color = Color.Black.copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                                            modifier = Modifier.clickable { isExchangeDropdownExpanded = true }
                                         ) {
-                                            Surface(
-                                                color = Color.White,
-                                                shape = RoundedCornerShape(4.dp),
-                                                modifier = Modifier.size(14.dp)
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text("B", color = Color.Black, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+                                                Surface(
+                                                    color = Color.White,
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    modifier = Modifier.size(14.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text(state.selectedExchange.take(1).uppercase(), color = Color.Black, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+                                                    }
                                                 }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(state.selectedExchange.uppercase(), color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                                             }
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(state.selectedExchange.replaceFirstChar { it.uppercase() }, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                                        }
+
+                                        DropdownMenu(
+                                            expanded = isExchangeDropdownExpanded,
+                                            onDismissRequest = { isExchangeDropdownExpanded = false },
+                                            modifier = Modifier.background(CardBg)
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("BYBIT", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                                                onClick = {
+                                                    isExchangeDropdownExpanded = false
+                                                    viewModel.changeExchange("bybit")
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("BINANCE", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                                                onClick = {
+                                                    isExchangeDropdownExpanded = false
+                                                    viewModel.changeExchange("binance")
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("OKX", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                                                onClick = {
+                                                    isExchangeDropdownExpanded = false
+                                                    viewModel.changeExchange("okx")
+                                                }
+                                            )
                                         }
                                     }
 
@@ -394,11 +420,11 @@ fun DashboardScreen(
                             }
 
                             val avail = state.portfolioSummary?.availableBalanceUsdt
-                            val total = state.portfolioSummary?.totalBalanceUsdt ?: (avail ?: (state.userSettings?.totalCapitalUsdt ?: 1245.32))
+                            val total = state.portfolioSummary?.totalBalanceUsdt ?: (avail ?: 0.0)
 
                             if (state.isLoading) {
                                 CircularProgressIndicator(color = BrandPurple, modifier = Modifier.size(24.dp))
-                            } else {
+                            } else if (state.portfolioSummary != null) {
                                 Text(
                                     text = String.format("%,.2f", total),
                                     color = TextPrimary,
@@ -410,11 +436,30 @@ fun DashboardScreen(
                                     Icon(Icons.Default.NorthEast, contentDescription = null, tint = BullishGreen, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "+52.14 (+4.37%) اليوم",
+                                        text = "الرصيد الحي المباشر من ${state.selectedExchange.uppercase()}",
                                         color = BullishGreen,
-                                        fontSize = 13.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )
+                                }
+                            } else {
+                                Column {
+                                    Text(
+                                        text = "$0.00 USDT",
+                                        color = Color.White,
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "اربط منصة ${state.selectedExchange.uppercase()} لعرض رصيدك الحقيقي",
+                                        color = Color.Yellow,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    TextButton(onClick = onNavigateToExchange) {
+                                        Text("إشعارات ربط الـ API", color = BrandPurpleLight, fontSize = 12.sp)
+                                    }
                                 }
                             }
 
@@ -427,7 +472,7 @@ fun DashboardScreen(
                                 Column {
                                     Text("الرصيد المتاح", color = TextSecondary, fontSize = 11.sp)
                                     Text(
-                                        text = String.format("%,.2f", avail ?: (state.userSettings?.totalCapitalUsdt ?: 1180.50)),
+                                        text = String.format("%,.2f", avail ?: 0.0),
                                         color = TextPrimary,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
@@ -437,7 +482,7 @@ fun DashboardScreen(
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text("في الصفقات", color = TextSecondary, fontSize = 11.sp)
                                     Text(
-                                        text = String.format("%,.2f", state.portfolioSummary?.inOrdersUsdt ?: 64.82),
+                                        text = String.format("%,.2f", state.portfolioSummary?.inOrdersUsdt ?: 0.0),
                                         color = TextPrimary,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold

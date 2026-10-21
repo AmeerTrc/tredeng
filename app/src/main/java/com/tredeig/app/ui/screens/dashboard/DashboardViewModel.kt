@@ -49,12 +49,18 @@ class DashboardViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
+            // Check saved statuses to discover connected exchange automatically
+            val statusesRes = exchangeRepository.getAllExchangeStatus()
             val settingsRes = exchangeRepository.getUserSettings()
+
+            val statuses = if (statusesRes is Resource.Success) statusesRes.data ?: emptyList() else emptyList()
             val settings = if (settingsRes is Resource.Success) settingsRes.data else null
-            val exchange = settings?.selectedExchange ?: "bybit"
+
+            val connectedEx = statuses.find { it.isConnected && it.apiKeyMasked != "غير مرتبط" }
+            val activeExchange = connectedEx?.exchangeName?.lowercase() ?: (settings?.selectedExchange ?: "bybit")
 
             val portfolioRes = exchangeRepository.getPortfolioSummary()
-            val tickerRes = marketRepository.getTicker(_uiState.value.activeSymbol, exchange)
+            val tickerRes = marketRepository.getTicker(_uiState.value.activeSymbol, activeExchange)
 
             val portfolio = if (portfolioRes is Resource.Success) portfolioRes.data else null
             val ticker = if (tickerRes is Resource.Success) tickerRes.data else null
@@ -63,12 +69,21 @@ class DashboardViewModel(
                 portfolioSummary = portfolio,
                 ticker = ticker,
                 userSettings = settings,
-                selectedExchange = exchange,
+                selectedExchange = activeExchange,
                 isLoading = false,
                 errorMessage = if (portfolioRes is Resource.Error) portfolioRes.message else null
             )
 
-            loadKlines(_uiState.value.activeSymbol, _uiState.value.selectedInterval, exchange)
+            loadKlines(_uiState.value.activeSymbol, _uiState.value.selectedInterval, activeExchange)
+        }
+    }
+
+    fun changeExchange(exchangeName: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(selectedExchange = exchangeName)
+            val currentSettings = _uiState.value.userSettings ?: UserSettingsDto()
+            exchangeRepository.saveUserSettings(currentSettings.copy(selectedExchange = exchangeName))
+            loadDashboard()
         }
     }
 

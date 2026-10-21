@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tredeig.app.data.remote.dto.KlineDto
 import com.tredeig.app.domain.model.MarketTicker
+import kotlinx.coroutines.delay
 
 val BgMain = Color(0xFF070B19)
 val CardBg = Color(0xFF10172A)
@@ -48,6 +49,8 @@ fun ChartScreen(
     errorMessage: String?,
     onIntervalSelected: (String) -> Unit,
     onRefresh: () -> Unit,
+    onOpenPosition: (symbol: String, amount: Double, slPct: Double, tpPct: Double) -> Unit = { _, _, _, _ -> },
+    onClosePosition: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     val intervals = listOf("1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M")
@@ -58,7 +61,44 @@ fun ChartScreen(
     var takeProfitText by remember { mutableStateOf("4.0") }
     var stopLossText by remember { mutableStateOf("2.0") }
     var isAiActive by remember { mutableStateOf(true) }
+    var hasActiveTrade by remember { mutableStateOf(false) }
     var saveSuccessMsg by remember { mutableStateOf<String?>(null) }
+    var showForceCloseDialog by remember { mutableStateOf(false) }
+
+    // Live Moving Chart Auto-Refresh Polling Every 3 Seconds
+    LaunchedEffect(symbol, selectedInterval, exchangeName) {
+        while (true) {
+            delay(3000)
+            onRefresh()
+        }
+    }
+
+    // Force Close Confirmation Dialog
+    if (showForceCloseDialog) {
+        AlertDialog(
+            onDismissRequest = { showForceCloseDialog = false },
+            title = { Text("تأكيد الإغلاق الإجباري للصفقة", fontWeight = FontWeight.Bold, color = BearishRed) },
+            text = { Text("هل أنت تأكد من إغلاق صفقة ${symbol.uppercase()} إجباريًا بالسعر اللحظي الحالي وتثبيت الأرباح/الخسائر؟") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showForceCloseDialog = false
+                        hasActiveTrade = false
+                        saveSuccessMsg = "تم إغلاق صفقة ${symbol.uppercase()} إجباريًا بنجاح!"
+                        onClosePosition()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BearishRed)
+                ) {
+                    Text("إغلاق إجباري فوراً", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForceCloseDialog = false }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -92,8 +132,8 @@ fun ChartScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Toggle favorite */ }) {
-                        Icon(Icons.Default.StarOutline, contentDescription = "Favorite", tint = BrandPurpleLight)
+                    IconButton(onClick = { onRefresh() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh Chart", tint = BrandPurpleLight)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BgMain)
@@ -133,7 +173,7 @@ fun ChartScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "${if (pct >= 0) "+" else ""}${String.format("%.2f", pct)}% (24h)",
+                            text = "${if (pct >= 0) "+" else ""}${String.format("%.2f", pct)}% (24h) ● مباشر",
                             color = if (pct >= 0) BullishGreen else BearishRed,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
@@ -160,8 +200,7 @@ fun ChartScreen(
                     Surface(
                         color = if (selectedInterval == interval) BrandPurple else Color.Transparent,
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .clickable { onIntervalSelected(interval) }
+                        modifier = Modifier.clickable { onIntervalSelected(interval) }
                     ) {
                         Text(
                             text = interval,
@@ -174,7 +213,7 @@ fun ChartScreen(
                 }
             }
 
-            // Real Candlestick Chart Area
+            // Real Live Moving Candlestick Chart Area
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -182,12 +221,12 @@ fun ChartScreen(
                     .background(CardBg, RoundedCornerShape(16.dp))
                     .padding(8.dp)
             ) {
-                if (isLoading) {
+                if (isLoading && klines.isEmpty()) {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
                         color = BrandPurple
                     )
-                } else if (errorMessage != null) {
+                } else if (errorMessage != null && klines.isEmpty()) {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -197,13 +236,13 @@ fun ChartScreen(
                         Button(onClick = onRefresh) { Text("إعادة التحميل") }
                     }
                 } else if (klines.isEmpty()) {
-                    Text("جاري جلب بيانات الشموع اليابانية...", color = TextSecondary, modifier = Modifier.align(Alignment.Center))
+                    Text("جاري جلب الشموع اليابانية المباشرة...", color = TextSecondary, modifier = Modifier.align(Alignment.Center))
                 } else {
                     CandlestickCanvas(klines = klines)
                 }
             }
 
-            // AI Trading Controls Card (لوحة تشغيل الصندوق والذكاء الاصطناعي)
+            // AI Strategy Control Panel
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBg),
                 shape = RoundedCornerShape(20.dp),
@@ -232,11 +271,11 @@ fun ChartScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text("إعدادات صندوق الذكاء الاصطناعي", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("إعدادات استراتيجية الذكاء الاصطناعي", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(modifier = Modifier.size(6.dp).background(if (isAiActive) BullishGreen else BearishRed, CircleShape))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (isAiActive) "الصندوق نشط - التداول الذكي مفعل" else "الصندوق متوقف حالياً", color = if (isAiActive) BullishGreen else BearishRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(if (isAiActive) "الاستراتيجية نشطة" else "الاستراتيجية متوقفة", color = if (isAiActive) BullishGreen else BearishRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -276,7 +315,7 @@ fun ChartScreen(
                         )
                     }
 
-                    // Risk & Entry Parameters (نسبة الأخذ والخسارة ومبلغ الدخول)
+                    // Risk & Entry Parameters
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -284,7 +323,7 @@ fun ChartScreen(
                         OutlinedTextField(
                             value = takeProfitText,
                             onValueChange = { takeProfitText = it },
-                            label = { Text("جني الأرباح %") },
+                            label = { Text("نسبة جني الأرباح %") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -294,7 +333,7 @@ fun ChartScreen(
                         OutlinedTextField(
                             value = stopLossText,
                             onValueChange = { stopLossText = it },
-                            label = { Text("وقف الخسارة %") },
+                            label = { Text("نسبة وقف الخسارة %") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -305,7 +344,7 @@ fun ChartScreen(
                     OutlinedTextField(
                         value = tradeAmountText,
                         onValueChange = { tradeAmountText = it },
-                        label = { Text("مبلغ دخول الصفقة (USDT)") },
+                        label = { Text("مبلغ دخول الأمر (USDT)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -316,17 +355,42 @@ fun ChartScreen(
                         Text(msg, color = BullishGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    Button(
-                        onClick = {
-                            saveSuccessMsg = "تم حفظ وتفعيل استراتيجية الذكاء الاصطناعي لـ $symbol بنجاح!"
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandPurple)
+                    // Action Buttons Row: "تنشيط الاستراتيجية" & "إغلاق إجباري"
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("تطبيق وتفعيل استراتيجية الصندوق", color = Color.White, fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = {
+                                val amt = tradeAmountText.toDoubleOrNull() ?: 100.0
+                                val sl = stopLossText.toDoubleOrNull() ?: 2.0
+                                val tp = takeProfitText.toDoubleOrNull() ?: 4.0
+                                hasActiveTrade = true
+                                saveSuccessMsg = "تم تنشيط الاستراتيجية وفتح صفقة لـ $symbol بنجاح!"
+                                onOpenPosition(symbol, amt, sl, tp)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPurple)
+                        ) {
+                            Text("تنشيط الاستراتيجية", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+
+                        if (hasActiveTrade) {
+                            OutlinedButton(
+                                onClick = { showForceCloseDialog = true },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = BearishRed),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, BearishRed)
+                            ) {
+                                Text("إغلاق إجباري", color = BearishRed, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
