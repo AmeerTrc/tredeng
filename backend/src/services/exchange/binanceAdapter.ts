@@ -3,6 +3,14 @@ import crypto from 'crypto';
 import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Balance } from './exchangeAdapter';
 import { ENV } from '../../config/env';
 
+const BINANCE_ENDPOINTS = [
+  ENV.BINANCE_BASE_URL,
+  'https://api1.binance.com',
+  'https://api2.binance.com',
+  'https://api3.binance.com',
+  'https://data-api.binance.vision'
+];
+
 export class BinanceAdapter implements ExchangeAdapter {
   getName(): string {
     return 'binance';
@@ -15,17 +23,29 @@ export class BinanceAdapter implements ExchangeAdapter {
       .digest('hex');
   }
 
+  private async fetchWithFallback(endpointPath: string, config: any = {}): Promise<any> {
+    let lastError = null;
+    for (const baseUrl of BINANCE_ENDPOINTS) {
+      try {
+        const url = `${baseUrl}${endpointPath}`;
+        const response = await axios.get(url, { ...config, timeout: 5000 });
+        return response;
+      } catch (err: any) {
+        lastError = err;
+        // Continue to next endpoint if restricted or timeout
+      }
+    }
+    throw lastError;
+  }
+
   async validateKeys(apiKey: string, apiSecret: string): Promise<ExchangeStatus> {
     try {
       const timestamp = Date.now();
       const queryString = `timestamp=${timestamp}`;
       const signature = this.generateSignature(queryString, apiSecret);
 
-      const response = await axios.get(`${ENV.BINANCE_BASE_URL}/api/v3/account?${queryString}&signature=${signature}`, {
-        headers: {
-          'X-MBX-APIKEY': apiKey
-        },
-        timeout: 8000
+      const response = await this.fetchWithFallback(`/api/v3/account?${queryString}&signature=${signature}`, {
+        headers: { 'X-MBX-APIKEY': apiKey }
       });
 
       const canTrade = response.data.canTrade ?? true;
@@ -58,11 +78,8 @@ export class BinanceAdapter implements ExchangeAdapter {
       const queryString = `timestamp=${timestamp}`;
       const signature = this.generateSignature(queryString, apiSecret);
 
-      const response = await axios.get(`${ENV.BINANCE_BASE_URL}/api/v3/account?${queryString}&signature=${signature}`, {
-        headers: {
-          'X-MBX-APIKEY': apiKey
-        },
-        timeout: 8000
+      const response = await this.fetchWithFallback(`/api/v3/account?${queryString}&signature=${signature}`, {
+        headers: { 'X-MBX-APIKEY': apiKey }
       });
 
       const rawBalances = response.data.balances || [];
@@ -107,9 +124,7 @@ export class BinanceAdapter implements ExchangeAdapter {
 
   async getTicker(symbol: string = 'BTCUSDT'): Promise<Ticker> {
     try {
-      const response = await axios.get(`${ENV.BINANCE_BASE_URL}/api/v3/ticker/24hr?symbol=${symbol}`, {
-        timeout: 5000
-      });
+      const response = await this.fetchWithFallback(`/api/v3/ticker/24hr?symbol=${symbol}`);
 
       return {
         symbol: response.data.symbol,
@@ -128,10 +143,7 @@ export class BinanceAdapter implements ExchangeAdapter {
 
   async getAvailableSymbols(): Promise<string[]> {
     try {
-      const response = await axios.get(`${ENV.BINANCE_BASE_URL}/api/v3/exchangeInfo`, {
-        timeout: 8000
-      });
-      // Return only SPOT trading pairs that are trading
+      const response = await this.fetchWithFallback(`/api/v3/exchangeInfo`);
       const symbols = response.data.symbols
         .filter((s: any) => s.status === 'TRADING' && s.isSpotTradingAllowed)
         .map((s: any) => s.symbol);
