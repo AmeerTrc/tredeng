@@ -29,6 +29,7 @@ export interface ExchangeStatus {
   permissions: string[];
   canTradeSpot: boolean;
   canWithdraw: boolean;
+  errorMessage?: string;
 }
 
 export interface ExchangeAdapter {

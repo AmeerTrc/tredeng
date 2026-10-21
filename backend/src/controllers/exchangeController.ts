@@ -41,7 +41,7 @@ export class ExchangeController {
         res.status(400).json({
           success: false,
           data: status,
-          message: 'فشل التحقق من مفاتيح API لدى المنصة. تأكد من صحة المفاتيح وصلاحية Spot Trading.'
+          message: status.errorMessage || 'فشل التحقق من مفاتيح API لدى المنصة. تأكد من صحة المفاتيح وصلاحية Spot Trading.'
         });
         return;
       }

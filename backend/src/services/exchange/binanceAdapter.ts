@@ -3,12 +3,16 @@ import crypto from 'crypto';
 import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Balance } from './exchangeAdapter';
 import { ENV } from '../../config/env';
 
-const BINANCE_PUBLIC_ENDPOINTS = [
-  'https://data-api.binance.vision',
+const BINANCE_AUTH_ENDPOINTS = [
+  ENV.BINANCE_BASE_URL || 'https://api.binance.com',
   'https://api1.binance.com',
   'https://api2.binance.com',
-  'https://api3.binance.com',
-  ENV.BINANCE_BASE_URL
+  'https://api3.binance.com'
+];
+
+const BINANCE_PUBLIC_ENDPOINTS = [
+  'https://data-api.binance.vision',
+  ...BINANCE_AUTH_ENDPOINTS
 ];
 
 export class BinanceAdapter implements ExchangeAdapter {
@@ -21,6 +25,24 @@ export class BinanceAdapter implements ExchangeAdapter {
       .createHmac('sha256', apiSecret)
       .update(queryString)
       .digest('hex');
+  }
+
+  private async fetchAuthWithFallback(endpointPath: string, config: any = {}): Promise<any> {
+    let lastError = null;
+    for (const baseUrl of BINANCE_AUTH_ENDPOINTS) {
+      try {
+        const url = `${baseUrl}${endpointPath}`;
+        const response = await axios.get(url, { ...config, timeout: 8000 });
+        return response;
+      } catch (err: any) {
+        lastError = err;
+        // If it's a 4xx error from Binance (e.g. invalid key or IP), don't keep retrying identical endpoints
+        if (err.response && (err.response.status === 400 || err.response.status === 401 || err.response.status === 403)) {
+          throw err;
+        }
+      }
+    }
+    throw lastError;
   }
 
   private async fetchWithFallback(endpointPath: string, config: any = {}): Promise<any> {
@@ -40,10 +62,10 @@ export class BinanceAdapter implements ExchangeAdapter {
   async validateKeys(apiKey: string, apiSecret: string): Promise<ExchangeStatus> {
     try {
       const timestamp = Date.now();
-      const queryString = `timestamp=${timestamp}`;
+      const queryString = `timestamp=${timestamp}&recvWindow=60000`;
       const signature = this.generateSignature(queryString, apiSecret);
 
-      const response = await this.fetchWithFallback(`/api/v3/account?${queryString}&signature=${signature}`, {
+      const response = await this.fetchAuthWithFallback(`/api/v3/account?${queryString}&signature=${signature}`, {
         headers: { 'X-MBX-APIKEY': apiKey }
       });
 
@@ -59,14 +81,17 @@ export class BinanceAdapter implements ExchangeAdapter {
         canWithdraw: canWithdraw
       };
     } catch (error: any) {
-      console.error('Binance API validation error:', error.response?.data || error.message);
+      const errData = error.response?.data;
+      const errorMsg = errData ? (errData.msg || JSON.stringify(errData)) : error.message;
+      console.error('Binance API validation error:', errorMsg);
       return {
         exchangeName: 'Binance Spot',
         isConnected: false,
         apiKeyMasked: 'INVALID',
         permissions: [],
         canTradeSpot: false,
-        canWithdraw: false
+        canWithdraw: false,
+        errorMessage: `Binance: ${errorMsg}`
       };
     }
   }
