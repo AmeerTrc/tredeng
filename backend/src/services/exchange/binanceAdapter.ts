@@ -3,12 +3,12 @@ import crypto from 'crypto';
 import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Balance } from './exchangeAdapter';
 import { ENV } from '../../config/env';
 
-const BINANCE_ENDPOINTS = [
-  ENV.BINANCE_BASE_URL,
+const BINANCE_PUBLIC_ENDPOINTS = [
+  'https://data-api.binance.vision',
   'https://api1.binance.com',
   'https://api2.binance.com',
   'https://api3.binance.com',
-  'https://data-api.binance.vision'
+  ENV.BINANCE_BASE_URL
 ];
 
 export class BinanceAdapter implements ExchangeAdapter {
@@ -25,14 +25,13 @@ export class BinanceAdapter implements ExchangeAdapter {
 
   private async fetchWithFallback(endpointPath: string, config: any = {}): Promise<any> {
     let lastError = null;
-    for (const baseUrl of BINANCE_ENDPOINTS) {
+    for (const baseUrl of BINANCE_PUBLIC_ENDPOINTS) {
       try {
         const url = `${baseUrl}${endpointPath}`;
         const response = await axios.get(url, { ...config, timeout: 5000 });
         return response;
       } catch (err: any) {
         lastError = err;
-        // Continue to next endpoint if restricted or timeout
       }
     }
     throw lastError;
