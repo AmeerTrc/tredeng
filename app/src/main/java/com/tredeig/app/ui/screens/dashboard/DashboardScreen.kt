@@ -99,7 +99,7 @@ fun DashboardScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryGold),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("اختيار العملات", color = DarkBackground, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text("الأسواق والشارت", color = DarkBackground, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
 
@@ -190,7 +190,7 @@ fun DashboardScreen(
                 ) {
                     Text("الرصيد الإجمالي (USDT)", color = TextSecondary, fontSize = 14.sp)
                     Text(
-                        text = "$${String.format("%.2f", state.portfolio?.totalBalanceUsdt ?: 1000.0)}",
+                        text = "$${String.format("%.2f", state.portfolioSummary?.totalBalanceUsdt ?: (state.userSettings?.totalCapitalUsdt ?: 1000.0))}",
                         color = PrimaryGold,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold
@@ -204,11 +204,11 @@ fun DashboardScreen(
                     ) {
                         Column {
                             Text("الرصيد المتاح", color = TextSecondary, fontSize = 12.sp)
-                            Text("$${String.format("%.2f", state.portfolio?.availableBalanceUsdt ?: 1000.0)}", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("$${String.format("%.2f", state.portfolioSummary?.availableBalanceUsdt ?: (state.userSettings?.totalCapitalUsdt ?: 1000.0))}", color = TextPrimary, fontWeight = FontWeight.Bold)
                         }
                         Column {
                             Text("في الصفقات", color = TextSecondary, fontSize = 12.sp)
-                            Text("$${String.format("%.2f", state.portfolio?.inOrdersUsdt ?: 0.0)}", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("$${String.format("%.2f", state.portfolioSummary?.inOrdersUsdt ?: 0.0)}", color = TextPrimary, fontWeight = FontWeight.Bold)
                         }
                         Column {
                             Text("الخسارة اليومية", color = TextSecondary, fontSize = 12.sp)
@@ -218,7 +218,7 @@ fun DashboardScreen(
                 }
             }
 
-            // BTC Market Live Ticker Card
+            // Bybit / Binance Market Live Ticker Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBackground),
                 shape = RoundedCornerShape(16.dp),
@@ -231,7 +231,7 @@ fun DashboardScreen(
                 ) {
                     Column {
                         Text("زوج BTC / USDT", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("سعر التداول اللحظي من Binance", color = TextSecondary, fontSize = 12.sp)
+                        Text("سعر التداول اللحظي الحقيقي", color = TextSecondary, fontSize = 12.sp)
                     }
 
                     Column(horizontalAlignment = Alignment.End) {

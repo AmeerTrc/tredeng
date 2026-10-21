@@ -50,6 +50,32 @@ class ExchangeRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
         }
     }
 
+    suspend fun deleteKeys(exchangeName: String): Resource<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.deleteExchangeKeys(getAuthHeader(), exchangeName)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(Unit)
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل حذف المفاتيح")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun getAllExchangeStatus(): Resource<List<ExchangeStatusResponse>> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.getAllExchangeStatus(getAuthHeader())
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(response.body()!!.data ?: emptyList())
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل جلب حالة المنصات")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
     suspend fun getPortfolioSummary(): Resource<PortfolioSummary> = withContext(Dispatchers.IO) {
         try {
             val response = ApiClient.instance.getAccountBalance(getAuthHeader())
@@ -113,7 +139,7 @@ class ExchangeRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
         }
     }
 
-    suspend fun getAvailableSymbols(exchangeName: String = "binance"): Resource<List<String>> = withContext(Dispatchers.IO) {
+    suspend fun getAvailableSymbols(exchangeName: String = "bybit"): Resource<List<String>> = withContext(Dispatchers.IO) {
         try {
             val response = ApiClient.instance.getAvailableSymbols(getAuthHeader(), exchangeName)
             if (response.isSuccessful && response.body()?.success == true) {
@@ -126,7 +152,7 @@ class ExchangeRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
         }
     }
 
-    suspend fun getSelectedCoins(exchangeName: String = "binance"): Resource<List<SelectedCoinDto>> = withContext(Dispatchers.IO) {
+    suspend fun getSelectedCoins(exchangeName: String = "bybit"): Resource<List<SelectedCoinDto>> = withContext(Dispatchers.IO) {
         try {
             val response = ApiClient.instance.getSelectedCoins(getAuthHeader(), exchangeName)
             if (response.isSuccessful && response.body()?.success == true) {
@@ -139,7 +165,7 @@ class ExchangeRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
         }
     }
 
-    suspend fun saveSelectedCoin(exchangeName: String = "binance", symbol: String, isActive: Boolean, isFavorite: Boolean = false): Resource<Unit> = withContext(Dispatchers.IO) {
+    suspend fun saveSelectedCoin(exchangeName: String = "bybit", symbol: String, isActive: Boolean, isFavorite: Boolean = false): Resource<Unit> = withContext(Dispatchers.IO) {
         try {
             val response = ApiClient.instance.saveSelectedCoin(getAuthHeader(), exchangeName, SaveSelectedCoinRequest(symbol, isActive, isFavorite))
             if (response.isSuccessful && response.body()?.success == true) {

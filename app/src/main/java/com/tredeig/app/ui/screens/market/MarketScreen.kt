@@ -21,7 +21,11 @@ import com.tredeig.app.core.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MarketScreen(viewModel: MarketViewModel, onBack: () -> Unit) {
+fun MarketScreen(
+    viewModel: MarketViewModel,
+    onBack: () -> Unit,
+    onCoinClick: (String) -> Unit = {}
+) {
     val uiState by viewModel.uiState.collectAsState()
 
     val filteredSymbols = uiState.availableSymbols.filter {
@@ -42,12 +46,17 @@ fun MarketScreen(viewModel: MarketViewModel, onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("اختيار العملات وأزواج التداول", color = PrimaryGold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("اختيار العملات وسوق التداول", color = PrimaryGold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
-            Text("حدد العملات التي يسمح للروبوت بتداولها واضغط نجمة لإضافتها للمفضلة:", color = TextSecondary, fontSize = 12.sp)
+            Text("حدد العملات المتاحة، واضغط على اسم العملة لفتح الشارت والشموع اليابانية:", color = TextSecondary, fontSize = 12.sp)
 
             // Exchange Selector Tabs
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                FilterChip(
+                    selected = uiState.selectedExchange == "bybit",
+                    onClick = { viewModel.setExchange("bybit") },
+                    label = { Text("Bybit") }
+                )
                 FilterChip(
                     selected = uiState.selectedExchange == "binance",
                     onClick = { viewModel.setExchange("binance") },
@@ -57,11 +66,6 @@ fun MarketScreen(viewModel: MarketViewModel, onBack: () -> Unit) {
                     selected = uiState.selectedExchange == "okx",
                     onClick = { viewModel.setExchange("okx") },
                     label = { Text("OKX") }
-                )
-                FilterChip(
-                    selected = uiState.selectedExchange == "bybit",
-                    onClick = { viewModel.setExchange("bybit") },
-                    label = { Text("Bybit") }
                 )
             }
 
@@ -98,7 +102,8 @@ fun MarketScreen(viewModel: MarketViewModel, onBack: () -> Unit) {
                         isActive = isActive,
                         isFavorite = isFav,
                         onToggleActive = { active -> viewModel.toggleCoinActive(symbol, active) },
-                        onToggleFavorite = { viewModel.toggleFavorite(symbol) }
+                        onToggleFavorite = { viewModel.toggleFavorite(symbol) },
+                        onCoinClick = { onCoinClick(symbol) }
                     )
                 }
             }
@@ -121,12 +126,14 @@ fun CoinItemRow(
     isActive: Boolean,
     isFavorite: Boolean,
     onToggleActive: (Boolean) -> Unit,
-    onToggleFavorite: () -> Unit
+    onToggleFavorite: () -> Unit,
+    onCoinClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(DarkBackground, RoundedCornerShape(8.dp))
+            .clickable { onCoinClick() }
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically

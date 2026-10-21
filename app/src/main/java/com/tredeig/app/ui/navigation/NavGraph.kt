@@ -1,6 +1,8 @@
 package com.tredeig.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,6 +18,7 @@ import com.tredeig.app.ui.screens.exchange.ExchangeViewModel
 import com.tredeig.app.ui.screens.market.ChartScreen
 import com.tredeig.app.ui.screens.market.MarketScreen
 import com.tredeig.app.ui.screens.market.MarketViewModel
+import com.tredeig.app.ui.screens.portfolio.PortfolioScreen
 import com.tredeig.app.ui.screens.positions.OpenPositionsScreen
 import com.tredeig.app.ui.screens.positions.PositionsViewModel
 import com.tredeig.app.ui.screens.positions.TradeHistoryScreen
@@ -34,6 +37,8 @@ fun TredeigNavGraph(
     marketViewModel: MarketViewModel,
     positionsViewModel: PositionsViewModel
 ) {
+    val dashState by dashboardViewModel.uiState.collectAsState()
+
     NavHost(
         navController = navController,
         startDestination = Screen.Dashboard.route
@@ -71,6 +76,7 @@ fun TredeigNavGraph(
 
         composable(Screen.EmergencyStop.route) {
             EmergencyStopScreen(
+                isKillSwitchActive = dashState.isKillSwitchActive,
                 onToggleKillSwitch = { active -> dashboardViewModel.toggleKillSwitch(active) },
                 onBack = { navController.popBackStack() }
             )
@@ -93,12 +99,38 @@ fun TredeigNavGraph(
         composable(Screen.Market.route) {
             MarketScreen(
                 viewModel = marketViewModel,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onCoinClick = { symbol ->
+                    marketViewModel.selectSymbolForChart(symbol)
+                    navController.navigate(Screen.Chart.route)
+                }
             )
         }
 
         composable(Screen.Chart.route) {
-            ChartScreen(onBack = { navController.popBackStack() })
+            val state by marketViewModel.uiState.collectAsState()
+            ChartScreen(
+                symbol = state.activeSymbol,
+                exchangeName = state.selectedExchange,
+                ticker = state.ticker,
+                klines = state.klines,
+                selectedInterval = state.selectedInterval,
+                isLoading = state.isChartLoading,
+                errorMessage = state.chartError,
+                onIntervalSelected = { interval -> marketViewModel.setIntervalForChart(interval) },
+                onRefresh = { marketViewModel.loadChartData(state.activeSymbol, state.selectedInterval, state.selectedExchange) }
+            )
+        }
+
+        composable("portfolio") {
+            PortfolioScreen(
+                portfolioSummary = dashState.portfolioSummary,
+                isPaperTrading = dashState.userSettings?.isPaperTrading ?: true,
+                paperCapitalUsdt = dashState.userSettings?.totalCapitalUsdt ?: 1000.0,
+                isLoading = dashState.isLoading,
+                errorMessage = dashState.errorMessage,
+                onRefresh = { dashboardViewModel.loadDashboard() }
+            )
         }
 
         composable(Screen.AIAssistant.route) {

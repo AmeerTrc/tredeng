@@ -3,6 +3,7 @@ package com.tredeig.app.ui.screens.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tredeig.app.core.common.Resource
+import com.tredeig.app.data.remote.dto.UserSettingsDto
 import com.tredeig.app.data.repository.ExchangeRepositoryImpl
 import com.tredeig.app.data.repository.MarketRepositoryImpl
 import com.tredeig.app.domain.model.MarketTicker
@@ -12,12 +13,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 data class DashboardUiState(
-    val portfolio: PortfolioSummary? = null,
+    val portfolioSummary: PortfolioSummary? = null,
     val ticker: MarketTicker? = null,
+    val userSettings: UserSettingsDto? = null,
     val isKillSwitchActive: Boolean = false,
     val isWsConnected: Boolean = true,
     val isApiConnected: Boolean = true,
-    val tradingStatusText: String = "توقف التداول (المرحلة الأولى)",
+    val tradingStatusText: String = "التداول النشط",
     val dailyLossUsdt: Double = 0.0,
     val dailyTradesCount: Int = 0,
     val isLoading: Boolean = false,
@@ -33,22 +35,25 @@ class DashboardViewModel(
     val uiState: StateFlow<DashboardUiState> = _uiState
 
     init {
-        loadDashboardData()
+        loadDashboard()
     }
 
-    fun loadDashboardData() {
+    fun loadDashboard() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
             val portfolioRes = exchangeRepository.getPortfolioSummary()
-            val tickerRes = marketRepository.getTicker("BTCUSDT")
+            val tickerRes = marketRepository.getTicker("BTCUSDT", "bybit")
+            val settingsRes = exchangeRepository.getUserSettings()
 
             val portfolio = if (portfolioRes is Resource.Success) portfolioRes.data else null
             val ticker = if (tickerRes is Resource.Success) tickerRes.data else null
+            val settings = if (settingsRes is Resource.Success) settingsRes.data else null
 
             _uiState.value = _uiState.value.copy(
-                portfolio = portfolio,
+                portfolioSummary = portfolio,
                 ticker = ticker,
+                userSettings = settings,
                 isLoading = false,
                 errorMessage = if (portfolioRes is Resource.Error) portfolioRes.message else null
             )
@@ -61,7 +66,7 @@ class DashboardViewModel(
             if (res is Resource.Success) {
                 _uiState.value = _uiState.value.copy(
                     isKillSwitchActive = res.data ?: active,
-                    tradingStatusText = if (res.data == true) "إيقاف الطوارئ (Kill Switch)" else "توقف التداول (المرحلة الأولى)"
+                    tradingStatusText = if (res.data == true) "إيقاف الطوارئ (Kill Switch)" else "التداول المتاح"
                 )
             }
         }

@@ -18,6 +18,17 @@ interface TredeigApiService {
         @Body request: SaveExchangeKeysRequest
     ): Response<ApiResponse<ExchangeStatusResponse>>
 
+    @DELETE("api/exchange/keys/{exchangeName}")
+    suspend fun deleteExchangeKeys(
+        @Header("Authorization") token: String,
+        @Path("exchangeName") exchangeName: String
+    ): Response<ApiResponse<Any>>
+
+    @GET("api/exchange/all-status")
+    suspend fun getAllExchangeStatus(
+        @Header("Authorization") token: String
+    ): Response<ApiResponse<List<ExchangeStatusResponse>>>
+
     @GET("api/exchange/status")
     suspend fun getExchangeStatus(
         @Header("Authorization") token: String
@@ -30,8 +41,16 @@ interface TredeigApiService {
 
     @GET("api/market/ticker/{symbol}")
     suspend fun getMarketTicker(
-        @Path("symbol") symbol: String = "BTCUSDT"
+        @Path("symbol") symbol: String = "BTCUSDT",
+        @Query("exchange") exchange: String = "bybit"
     ): Response<ApiResponse<TickerResponse>>
+
+    @GET("api/market/klines/{symbol}")
+    suspend fun getKlines(
+        @Path("symbol") symbol: String = "BTCUSDT",
+        @Query("interval") interval: String = "15m",
+        @Query("exchange") exchange: String = "bybit"
+    ): Response<ApiResponse<List<KlineDto>>>
 
     @GET("api/market/symbols/{exchangeName}")
     suspend fun getAvailableSymbols(

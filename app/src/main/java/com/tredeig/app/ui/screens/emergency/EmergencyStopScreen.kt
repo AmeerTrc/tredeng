@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -15,10 +16,69 @@ import com.tredeig.app.core.theme.*
 
 @Composable
 fun EmergencyStopScreen(
+    isKillSwitchActive: Boolean,
     onToggleKillSwitch: (Boolean) -> Unit,
     onBack: () -> Unit
 ) {
-    var isEmergencyActive by remember { mutableStateOf(true) }
+    var showActivateConfirmDialog by remember { mutableStateOf(false) }
+    var showDeactivateConfirmDialog by remember { mutableStateOf(false) }
+
+    // Confirmation Dialog for Activation
+    if (showActivateConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showActivateConfirmDialog = false },
+            title = { Text("تأكيد تفعيل إيقاف الطوارئ (Kill Switch)", fontWeight = FontWeight.Bold, color = AccentRed) },
+            text = {
+                Text(
+                    "عند التفعيل:\n\n" +
+                    "1. سيتم حظر الخادم فوراً من فتح أي صفقات جديدة آلياً أو يدوياً.\n" +
+                    "2. الصفقات المفتوحة حالياً ستبقى كما هي وستحتاج لإغلاقها يدوياً إذا رغبت.\n" +
+                    "3. لن يتم حذف مفاتيح API الخاصة بك."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showActivateConfirmDialog = false
+                        onToggleKillSwitch(true)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                ) {
+                    Text("تأكيد التفعيل الفوري")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showActivateConfirmDialog = false }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
+
+    // Confirmation Dialog for Deactivation
+    if (showDeactivateConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeactivateConfirmDialog = false },
+            title = { Text("تأكيد إعادة تشغيل التداول", fontWeight = FontWeight.Bold, color = PrimaryGold) },
+            text = { Text("هل أنت متاكد من استئناف السماح لربوت التداول التلقائي بفتح صفقات جديدة وفق حدود إعدادات المخاطر؟") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeactivateConfirmDialog = false
+                        onToggleKillSwitch(false)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGold)
+                ) {
+                    Text("استئناف التداول", color = DarkBackground, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeactivateConfirmDialog = false }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -35,43 +95,61 @@ fun EmergencyStopScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("زر إيقاف التداول الكلي (Kill Switch)", color = AccentRed, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("زر الطوارئ الموحد (Kill Switch)", color = PrimaryGold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
-            Text(
-                text = "عند تفعيل الإيقاف الطارئ، سيتم منع فتح أي صفقات جديدة فوراً من الخادم وتجميد كل الأوامر القادمة من الذكاء الاصطناعي.",
-                color = TextSecondary,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Button(
-                onClick = {
-                    isEmergencyActive = true
-                    onToggleKillSwitch(true)
-                },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                shape = RoundedCornerShape(14.dp)
+            // Current Status Badge
+            Surface(
+                color = if (isKillSwitchActive) AccentRed.copy(alpha = 0.2f) else AccentGreen.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(20.dp)
             ) {
-                Text("تفعيل إيقاف الطوارئ الكلي (EMERGENCY STOP)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    text = if (isKillSwitchActive) "حالة النظام: مُعَطّل / إيقاف طوارئ نَشِط" else "حالة النظام: طبيعي / التداول متاح",
+                    color = if (isKillSwitchActive) AccentRed else AccentGreen,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                )
             }
 
-            OutlinedButton(
-                onClick = {
-                    isEmergencyActive = false
-                    onToggleKillSwitch(false)
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(14.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryGold)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = DarkBackground),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("إلغاء التجميد وإعادة الوضع العادي", color = PrimaryGold, fontWeight = FontWeight.Bold)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("شرح آلية العمل الصريحة:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("• تفعيل الزر يمنع الخادم فوراً من فتح أي صفقات جديدة.", color = TextSecondary, fontSize = 12.sp)
+                    Text("• الصفقات المفتوحة حالياً لا تُغلق تلقائياً لحماية رأس المال، بل تظل مراقبة بواسطة Stop Loss ويمكنك إغلاقها يدوياً.", color = TextSecondary, fontSize = 12.sp)
+                    Text("• التفعيل لا يحذف مفاتيح API الخاصة بك من السيرفر.", color = TextSecondary, fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (!isKillSwitchActive) {
+                Button(
+                    onClick = { showActivateConfirmDialog = true },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("تفعيل إيقاف الطوارئ الكلي (EMERGENCY STOP)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            } else {
+                Button(
+                    onClick = { showDeactivateConfirmDialog = true },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGold),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("استئناف وإعادة تشغيل التداول", color = DarkBackground, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
             }
 
             TextButton(onClick = onBack) {
-                Text("العودة", color = TextSecondary)
+                Text("العودة للوحة التحكم", color = TextSecondary)
             }
         }
     }

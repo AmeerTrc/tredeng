@@ -12,7 +12,8 @@ data class ExchangeStatusResponse(
     val apiKeyMasked: String,
     val permissions: List<String>,
     val canTradeSpot: Boolean,
-    val canWithdraw: Boolean
+    val canWithdraw: Boolean,
+    val updatedAt: Long? = null
 )
 
 data class BalanceResponse(
@@ -85,6 +86,15 @@ data class PaperTradeDto(
     val fee: Double? = null,
     val createdAt: Long,
     val closedAt: Long? = null
+)
+
+data class KlineDto(
+    val openTime: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Double
 )
 
 data class ApiResponse<T>(

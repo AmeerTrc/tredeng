@@ -31,10 +31,10 @@ class MainActivity : ComponentActivity() {
         val dashboardViewModel = DashboardViewModel(exchangeRepo, marketRepo)
         val exchangeViewModel = ExchangeViewModel(exchangeRepo)
         val riskViewModel = RiskViewModel(exchangeRepo)
-        val marketViewModel = MarketViewModel(exchangeRepo)
+        val marketViewModel = MarketViewModel(exchangeRepo, marketRepo)
         val positionsViewModel = PositionsViewModel(exchangeRepo)
 
-        // Hardcoding credentials as requested to use directly in the app
+        // Auto-authenticate directly for instant user access
         val hardcodedEmail = "test@example.com"
         val hardcodedPassword = "password123"
         loginViewModel.login(hardcodedEmail, hardcodedPassword)
