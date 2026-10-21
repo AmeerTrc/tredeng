@@ -1,19 +1,24 @@
 package com.tredeig.app.ui.screens.exchange
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -22,6 +27,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tredeig.app.core.common.Resource
 import com.tredeig.app.core.theme.*
+
+data class ExchangeInfo(
+    val id: String,
+    val name: String,
+    val badgeColor: Color,
+    val textColor: Color,
+    val symbolLetter: String
+)
+
+val GLOBAL_EXCHANGES = listOf(
+    ExchangeInfo("bybit", "Bybit", Color(0xFFF7A600), Color.Black, "B"),
+    ExchangeInfo("binance", "Binance", Color(0xFFF0B90B), Color.Black, "❖"),
+    ExchangeInfo("okx", "OKX", Color(0xFF000000), Color.White, "O"),
+    ExchangeInfo("kucoin", "KuCoin", Color(0xFF24AE8F), Color.White, "K"),
+    ExchangeInfo("gateio", "Gate.io", Color(0xFF00A2D0), Color.White, "G"),
+    ExchangeInfo("bitget", "Bitget", Color(0xFF00F0FF), Color.Black, "B"),
+    ExchangeInfo("mexc", "MEXC", Color(0xFF2B62F6), Color.White, "M"),
+    ExchangeInfo("exness", "Exness", Color(0xFFFFD300), Color.Black, "E")
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,18 +100,18 @@ fun ExchangeConnectionScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Text("إدارة المنصات والاتصالات (API Keys)", color = PrimaryGold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("إدارة ورابط المنصات العالمية (API Keys)", color = PrimaryGold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "ربط وإدارة مفاتيح API الخاصة بمنصات Bybit وBinance وOKX لتفعيل التداول الآمن عبر الخادم المشفر.",
+                text = "ربط وإدارة مفاتيح API الخاصة بالمنصات العالمية المعتمدة مع تمييز المنصات النشطة باللون الأخضر المميز.",
                 color = TextSecondary,
                 fontSize = 12.sp
             )
         }
 
-        // List of Connected Exchanges & Their Status First
+        // List of Connected Exchanges & Their Real Status
         item {
-            Text("المفاتيح والمنصات المرتبطة بالحساب:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("المنصات المرتبطة والحالة المباشرة:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
 
         when (val statuses = allStatusesState) {
@@ -101,40 +125,85 @@ fun ExchangeConnectionScreen(
             is Resource.Success -> {
                 val list = statuses.data ?: emptyList()
                 items(list) { ex ->
+                    val isConnected = ex.isConnected && ex.apiKeyMasked != "غير مرتبط"
+                    val exchangeObj = GLOBAL_EXCHANGES.find { it.id == ex.exchangeName.lowercase() }
+
+                    // Card with VIBRANT GREEN HIGHLIGHT for connected exchanges!
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = CardBackground),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isConnected) AccentGreen.copy(alpha = 0.15f) else CardBackground
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                width = if (isConnected) 2.dp else 1.dp,
+                                color = if (isConnected) AccentGreen else BorderColor,
+                                shape = RoundedCornerShape(14.dp)
+                            )
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
-                                    Text(ex.exchangeName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                                    Text("المفتاح: ${ex.apiKeyMasked}", fontSize = 12.sp, color = TextSecondary)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Official Brand Logo Badge
+                                    Surface(
+                                        color = exchangeObj?.badgeColor ?: PrimaryGold,
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = exchangeObj?.symbolLetter ?: ex.exchangeName.take(1).uppercase(),
+                                                color = exchangeObj?.textColor ?: DarkBackground,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                fontSize = 18.sp
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column {
+                                        Text(
+                                            text = exchangeObj?.name ?: ex.exchangeName.uppercase(),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = Color.White
+                                        )
+                                        Text("المفتاح: ${ex.apiKeyMasked}", fontSize = 12.sp, color = TextSecondary)
+                                    }
                                 }
 
                                 Surface(
-                                    color = if (ex.isConnected) AccentGreen.copy(alpha = 0.2f) else AccentRed.copy(alpha = 0.1f),
-                                    shape = RoundedCornerShape(6.dp)
+                                    color = if (isConnected) AccentGreen else Color.DarkGray,
+                                    shape = RoundedCornerShape(20.dp)
                                 ) {
-                                    Text(
-                                        text = if (ex.isConnected) "نشط ومحفوظ" else "غير مرتبط",
-                                        color = if (ex.isConnected) AccentGreen else TextSecondary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (isConnected) {
+                                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                        }
+                                        Text(
+                                            text = if (isConnected) "نشط ومتصل" else "غير مرتبط",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
 
-                            if (ex.isConnected) {
+                            if (isConnected) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.End,
@@ -170,30 +239,51 @@ fun ExchangeConnectionScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("إضافة / تعديل مفتاح منصة جديد:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("اختر المنصة لإضافة مفتاح جديد:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // Horizontal Scrolling Brand Chips
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        FilterChip(
-                            selected = selectedExchange == "bybit",
-                            onClick = { selectedExchange = "bybit"; viewModel.clearState() },
-                            label = { Text("Bybit") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        FilterChip(
-                            selected = selectedExchange == "binance",
-                            onClick = { selectedExchange = "binance"; viewModel.clearState() },
-                            label = { Text("Binance") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        FilterChip(
-                            selected = selectedExchange == "okx",
-                            onClick = { selectedExchange = "okx"; viewModel.clearState() },
-                            label = { Text("OKX") },
-                            modifier = Modifier.weight(1f)
-                        )
+                        items(GLOBAL_EXCHANGES) { ex ->
+                            val isSel = selectedExchange == ex.id
+                            Surface(
+                                color = if (isSel) ex.badgeColor else CardBackground,
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isSel) ex.badgeColor else BorderColor),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { selectedExchange = ex.id; viewModel.clearState() }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = if (isSel) Color.White else ex.badgeColor,
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(20.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = ex.symbolLetter,
+                                                color = if (isSel) Color.Black else ex.textColor,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = ex.name,
+                                        color = if (isSel) ex.textColor else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     OutlinedTextField(

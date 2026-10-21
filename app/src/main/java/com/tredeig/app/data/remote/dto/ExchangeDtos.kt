@@ -66,6 +66,15 @@ data class SaveSelectedCoinRequest(
     val isFavorite: Boolean = false
 )
 
+data class OpenPositionRequest(
+    val symbol: String,
+    val exchangeName: String = "bybit",
+    val amount: Double = 100.0,
+    val stopLossPct: Double = 2.0,
+    val takeProfitPct: Double = 4.0,
+    val action: String = "BUY"
+)
+
 data class ClosePositionRequest(
     val tradeId: String
 )

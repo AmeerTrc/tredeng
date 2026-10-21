@@ -12,6 +12,7 @@ router.get('/status', authMiddleware as any, ExchangeController.getStatus as any
 
 // Positions & History
 router.get('/positions', authMiddleware as any, ExchangeController.getOpenPositions as any);
+router.post('/positions/open', authMiddleware as any, ExchangeController.openPosition as any);
 router.post('/positions/close', authMiddleware as any, ExchangeController.closePosition as any);
 router.get('/history', authMiddleware as any, ExchangeController.getTradeHistory as any);
 

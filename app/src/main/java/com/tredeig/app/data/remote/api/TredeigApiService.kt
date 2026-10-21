@@ -93,6 +93,12 @@ interface TredeigApiService {
         @Header("Authorization") token: String
     ): Response<ApiResponse<List<PaperTradeDto>>>
 
+    @POST("api/exchange/positions/open")
+    suspend fun openPosition(
+        @Header("Authorization") token: String,
+        @Body request: OpenPositionRequest
+    ): Response<ApiResponse<Any>>
+
     @POST("api/exchange/positions/close")
     suspend fun closePosition(
         @Header("Authorization") token: String,

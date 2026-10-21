@@ -178,6 +178,28 @@ class ExchangeRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
         }
     }
 
+    suspend fun openPosition(
+        symbol: String,
+        exchangeName: String = "bybit",
+        amount: Double = 100.0,
+        stopLossPct: Double = 2.0,
+        takeProfitPct: Double = 4.0
+    ): Resource<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = ApiClient.instance.openPosition(
+                getAuthHeader(),
+                OpenPositionRequest(symbol, exchangeName, amount, stopLossPct, takeProfitPct)
+            )
+            if (response.isSuccessful && response.body()?.success == true) {
+                Resource.Success(Unit)
+            } else {
+                Resource.Error(response.body()?.message ?: "فشل فتح الصفقة")
+            }
+        } catch (e: Exception) {
+            Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
+        }
+    }
+
     suspend fun getOpenPositions(): Resource<List<PaperTradeDto>> = withContext(Dispatchers.IO) {
         try {
             val response = ApiClient.instance.getOpenPositions(getAuthHeader())

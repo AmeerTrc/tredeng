@@ -17,6 +17,28 @@ function getAdapter(exchangeName: string) {
 }
 
 export class PaperTradingEngine {
+  static async openPosition(
+    userId: string,
+    exchangeName: string,
+    symbol: string,
+    action: string,
+    price: number,
+    amount: number,
+    stopLoss: number,
+    takeProfit: number
+  ): Promise<string> {
+    return await db.recordPaperTrade(
+      userId,
+      exchangeName,
+      symbol,
+      action,
+      price,
+      amount,
+      stopLoss,
+      takeProfit
+    );
+  }
+
   static async runCycleForUser(userId: string, exchangeName: string = 'binance'): Promise<void> {
     const isKillSwitch = await db.isKillSwitchActive(userId);
     if (isKillSwitch) {

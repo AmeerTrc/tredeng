@@ -4,15 +4,19 @@ import { CryptoService } from '../services/cryptoService';
 import { BinanceAdapter } from '../services/exchange/binanceAdapter';
 import { OkxAdapter } from '../services/exchange/okxAdapter';
 import { BybitAdapter } from '../services/exchange/bybitAdapter';
+import { ExnessAdapter } from '../services/exchange/exnessAdapter';
 import { DatabaseService } from '../services/storage/databaseService';
 import { PaperTradingEngine } from '../services/trading/paperTradingEngine';
 
 const db = DatabaseService.getInstance();
 
+const SUPPORTED_EXCHANGES = ['bybit', 'binance', 'okx', 'kucoin', 'gateio', 'bitget', 'mexc', 'exness'];
+
 function getAdapter(exchangeName: string) {
   switch (exchangeName.toLowerCase()) {
     case 'okx': return new OkxAdapter();
     case 'bybit': return new BybitAdapter();
+    case 'exness': return new ExnessAdapter();
     default: return new BinanceAdapter();
   }
 }
@@ -31,14 +35,14 @@ export class ExchangeController {
       const cleanKey = apiKey.trim();
       const cleanSecret = apiSecret.trim();
 
-      if (cleanKey.length < 8 || cleanSecret.length < 8) {
+      if (cleanKey.length < 6 || cleanSecret.length < 6) {
         res.status(400).json({ success: false, data: null, message: 'طول مفاتيح API غير مكتمل' });
         return;
       }
 
-      const selectedExchange = (exchangeName || 'binance').trim().toLowerCase();
-      if (!['binance', 'bybit', 'okx'].includes(selectedExchange)) {
-        res.status(400).json({ success: false, data: null, message: 'منصة غير مدعومة. المنصات المدعومة هي Binance و Bybit و OKX.' });
+      const selectedExchange = (exchangeName || 'bybit').trim().toLowerCase();
+      if (!SUPPORTED_EXCHANGES.includes(selectedExchange)) {
+        res.status(400).json({ success: false, data: null, message: `منصة غير مدعومة. المنصات المدعومة هي: ${SUPPORTED_EXCHANGES.join(', ')}.` });
         return;
       }
 
@@ -57,10 +61,10 @@ export class ExchangeController {
           exchangeName: `${selectedExchange.toUpperCase()} Spot`,
           isConnected: true,
           apiKeyMasked: `${cleanKey.substring(0, 4)}...${cleanKey.substring(cleanKey.length - 4)}`,
-          permissions: [],
+          permissions: ['SPOT', 'READ'],
           canTradeSpot: true,
           canWithdraw: false,
-          errorMessage: `تم حفظ المفتاح بنجاح!`
+          errorMessage: `تم حفظ وتفعيل المفتاح بنجاح!`
         };
       }
 
@@ -106,14 +110,12 @@ export class ExchangeController {
       const allKeys = await db.getAllExchangeKeys(userId);
 
       const statuses = [];
-      const supportedExchanges = ['bybit', 'binance', 'okx'];
 
-      for (const exName of supportedExchanges) {
+      for (const exName of SUPPORTED_EXCHANGES) {
         const savedKey = allKeys.find(k => k.exchangeName.toLowerCase() === exName);
         if (savedKey) {
           try {
             const apiKey = CryptoService.decrypt(savedKey.apiKeyEncrypted);
-            const apiSecret = CryptoService.decrypt(savedKey.apiSecretEncrypted);
             const masked = `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`;
 
             statuses.push({
@@ -152,7 +154,7 @@ export class ExchangeController {
       res.json({
         success: true,
         data: statuses,
-        message: 'تم جلب حالة مفاتيح المنصات بنجاح'
+        message: 'تم جلب حالة جميع المنصات بنجاح'
       });
     } catch (error: any) {
       res.status(500).json({ success: false, data: null, message: error.message });
@@ -214,7 +216,7 @@ export class ExchangeController {
         res.json({
           success: true,
           data: {
-            exchangeName: requestedExchange || 'binance',
+            exchangeName: requestedExchange || 'bybit',
             isConnected: false,
             apiKeyMasked: 'لم يتم الربط بعد',
             permissions: [],
@@ -238,6 +240,49 @@ export class ExchangeController {
     }
   }
 
+  static async openPosition(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const { symbol, exchangeName, amount, stopLossPct, takeProfitPct, action } = req.body;
+
+      if (!symbol) {
+        res.status(400).json({ success: false, data: null, message: 'رمز العملة مطلوب' });
+        return;
+      }
+
+      const selectedExchange = (exchangeName || 'bybit').toLowerCase();
+      const adapter = getAdapter(selectedExchange);
+      const ticker = await adapter.getTicker(symbol.toUpperCase());
+      const currentPrice = ticker.price;
+
+      const tradeAmount = parseFloat(amount || '100');
+      const slPct = parseFloat(stopLossPct || '2.0');
+      const tpPct = parseFloat(takeProfitPct || '4.0');
+
+      const stopLossPrice = currentPrice * (1 - (slPct / 100));
+      const takeProfitPrice = currentPrice * (1 + (tpPct / 100));
+
+      const tradeId = await PaperTradingEngine.openPosition(
+        userId,
+        selectedExchange,
+        symbol.toUpperCase(),
+        action || 'BUY',
+        currentPrice,
+        tradeAmount,
+        stopLossPrice,
+        takeProfitPrice
+      );
+
+      res.json({
+        success: true,
+        data: { tradeId, symbol: symbol.toUpperCase(), currentPrice },
+        message: `تم فتح صفقة ${symbol.toUpperCase()} بسعر $${currentPrice} وتنشيط الاستراتيجية بنجاح!`
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
   static async getOpenPositions(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
@@ -248,7 +293,7 @@ export class ExchangeController {
 
       for (const trade of openTrades) {
         try {
-          const adapter = getAdapter(trade.exchangeName || 'binance');
+          const adapter = getAdapter(trade.exchangeName || 'bybit');
           const ticker = await adapter.getTicker(trade.symbol);
           const currentPrice = ticker.price;
           const pnl = ((currentPrice - trade.price) / trade.price) * trade.amount;
