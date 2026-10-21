@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd backend && npm install && npm run build",
-    "start": "cd backend && npm start"
+    "build": "node -e \"const fs=require('fs'),cp=require('child_process');if(fs.existsSync('backend')){process.chdir('backend');}cp.execSync('npm install && npm run build',{stdio:'inherit'});\"",
+    "start": "node -e \"const fs=require('fs'),cp=require('child_process');if(fs.existsSync('backend')){process.chdir('backend');}cp.execSync('npm start',{stdio:'inherit'});\""
   }
 }
