@@ -191,7 +191,7 @@ export class DatabaseService {
           closedAt INTEGER
         );
       `);
-      console.log('SQLite database initialized successfully.');
+      console.log('SQLite native database driver initialized successfully on container.');
     } catch (error: any) {
       console.warn('SQLite native driver unavailable. Using JSON file fallback:', error.message);
       this.isFallback = true;
