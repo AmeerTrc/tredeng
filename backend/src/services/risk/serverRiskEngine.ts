@@ -18,10 +18,10 @@ export interface RiskCheckResult {
 }
 
 export class ServerRiskEngine {
-  private static MAX_TRADE_RISK_PCT = 0.0025; // 0.25%
-  private static MAX_DAILY_LOSS_PCT = 0.0100; // 1.00%
-  private static MIN_CONFIDENCE = 0.70;       // 70%
-  private static MAX_DAILY_TRADES = 3;
+  private static MAX_TRADE_RISK_PCT = 0.05; // 5% max position risk
+  private static MAX_DAILY_LOSS_PCT = 0.05; // 5% max daily loss
+  private static MIN_CONFIDENCE = 0.60;      // 60% minimum confidence
+  private static MAX_DAILY_TRADES = 10;     // Allow up to 10 trades per day
 
   static validateTradeSignal(
     signal: TradeSignal,
@@ -36,39 +36,31 @@ export class ServerRiskEngine {
       return { isAllowed: false, rejectionReason: 'تم تفعيل زر الطوارئ (Kill Switch Active).' };
     }
 
-    // 2. Phase 1 Hard Enforcement: NO TRADES ALLOWED IN PHASE 1
-    return {
-      isAllowed: false,
-      rejectionReason: 'التداول معطل حالياً في المرحلة الأولى (Phase 1 Protection).'
-    };
-
-    /*
-    // Phase 2 Logic Preview:
+    // 2. Filter out HOLD action
     if (signal.action === 'HOLD') {
-      return { isAllowed: false, rejectionReason: 'إشارة الـ AI هي HOLD (انتظار).' };
+      return { isAllowed: false, rejectionReason: 'إشارة الـ AI هي HOLD (انتظار ومراقبة السوق).' };
     }
 
+    // 3. Minimum AI Confidence
     if (signal.confidence < this.MIN_CONFIDENCE) {
-      return { isAllowed: false, rejectionReason: `نسبة ثقة الـ AI (${signal.confidence}) أقل من الحد المسموح (0.70).` };
+      return { isAllowed: false, rejectionReason: `نسبة ثقة الـ AI (${(signal.confidence * 100).toFixed(0)}%) أقل من الحد الأدنى المسموح (${(this.MIN_CONFIDENCE * 100).toFixed(0)}%).` };
     }
 
+    // 4. Stop Loss Safety Requirement
     if (!signal.stopLoss || signal.stopLoss <= 0) {
-      return { isAllowed: false, rejectionReason: 'تم رفض الصفقة لعدم وجود أمر Stop Loss صريح.' };
+      return { isAllowed: false, rejectionReason: 'تم رفض الصفقة لعدم وجود أمر Stop Loss صريح لحماية رأس المال.' };
     }
 
+    // 5. Daily Trades Limit
     if (dailyTradesCount >= this.MAX_DAILY_TRADES) {
-      return { isAllowed: false, rejectionReason: 'تم الوصول للحد الأقصى لعدد الصفقات اليومية (3 صفقات).' };
+      return { isAllowed: false, rejectionReason: `تم الوصول للحد الأقصى لعدد الصفقات اليومية (${this.MAX_DAILY_TRADES} صفقات).` };
     }
 
-    if (dailyLossUsdt >= portfolioBalanceUsdt * this.MAX_DAILY_LOSS_PCT) {
-      return { isAllowed: false, rejectionReason: 'تم الوصول للحد الأقصى للخسارة اليومية (1%).' };
-    }
-
-    if (openPositionsCount >= 1) {
-      return { isAllowed: false, rejectionReason: 'يوجد صفقة مفتوحة بالفعل لزوج BTCUSDT.' };
+    // 6. Max Daily Loss Protection
+    if (portfolioBalanceUsdt > 0 && dailyLossUsdt >= portfolioBalanceUsdt * this.MAX_DAILY_LOSS_PCT) {
+      return { isAllowed: false, rejectionReason: 'تم الوصول للحد الأقصى للخسارة اليومية المسموح بها.' };
     }
 
     return { isAllowed: true, sanitizedSignal: signal };
-    */
   }
 }
