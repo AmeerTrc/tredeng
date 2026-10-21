@@ -13,21 +13,18 @@ class AuthRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
 
     suspend fun login(email: String, passwordHash: String): Resource<User> = withContext(Dispatchers.IO) {
         try {
-            // Hardcode token for direct access as requested, bypassing network if needed
-            encryptedStorage.saveAuthToken("dummy_direct_token")
-            
             val response = ApiClient.instance.login(LoginRequest(email, passwordHash))
             if (response.isSuccessful && response.body()?.success == true) {
                 val data = response.body()!!.data!!
                 encryptedStorage.saveAuthToken(data.token)
-                Resource.Success(User(data.userId, data.email, isLiveTradingEnabled = false, killSwitchActive = false))
+                return@withContext Resource.Success(User(data.userId, data.email, isLiveTradingEnabled = false, killSwitchActive = false))
             } else {
-                // Return success anyway for direct access
-                Resource.Success(User("1", email, isLiveTradingEnabled = false, killSwitchActive = false))
+                // If login fails (user doesn't exist on backend), try registering automatically
+                return@withContext register(email, passwordHash)
             }
         } catch (e: Exception) {
-            // Return success anyway for direct access
-            Resource.Success(User("1", email, isLiveTradingEnabled = false, killSwitchActive = false))
+            // In case of network retry, attempt registration to get real JWT token
+            return@withContext register(email, passwordHash)
         }
     }
 
