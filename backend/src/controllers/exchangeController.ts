@@ -28,15 +28,23 @@ export class ExchangeController {
         return;
       }
 
-      if (apiKey.trim().length < 16 || apiSecret.trim().length < 16) {
+      const cleanKey = apiKey.trim();
+      const cleanSecret = apiSecret.trim();
+
+      if (cleanKey.length < 10 || cleanSecret.length < 10) {
         res.status(400).json({ success: false, data: null, message: 'طول مفاتيح API غير صالح' });
         return;
       }
 
-      const selectedExchange = (exchangeName || 'binance').toLowerCase();
+      const selectedExchange = (exchangeName || 'binance').trim().toLowerCase();
+      if (!['binance', 'bybit', 'okx'].includes(selectedExchange)) {
+        res.status(400).json({ success: false, data: null, message: 'منصة غير مدعومة. المنصات المدعومة هي Binance و Bybit و OKX.' });
+        return;
+      }
+
       const adapter = getAdapter(selectedExchange);
 
-      const status = await adapter.validateKeys(apiKey.trim(), apiSecret.trim());
+      const status = await adapter.validateKeys(cleanKey, cleanSecret);
       if (!status.isConnected) {
         res.status(400).json({
           success: false,
@@ -50,13 +58,13 @@ export class ExchangeController {
         res.status(400).json({
           success: false,
           data: null,
-          message: 'تحذير أمان: تم رفض المفتاح لوجود صلاحية السحب (Withdrawals). يرجى إنشاء مفتاح مخصص للتداول فقط دون سحب.'
+          message: 'تحذير أمان صارم: تم رفض المفتاح لوجود صلاحية السحب (Withdrawals). يرجى إنشاء مفتاح مخصص للتداول فقط دون سحب لحماية أموالك.'
         });
         return;
       }
 
-      const encryptedKey = CryptoService.encrypt(apiKey.trim());
-      const encryptedSecret = CryptoService.encrypt(apiSecret.trim());
+      const encryptedKey = CryptoService.encrypt(cleanKey);
+      const encryptedSecret = CryptoService.encrypt(cleanSecret);
 
       await db.saveExchangeKeys(userId, selectedExchange, encryptedKey, encryptedSecret);
 
@@ -73,7 +81,15 @@ export class ExchangeController {
   static async getBalance(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const userKeyInfo = await db.getExchangeKeys(userId, 'binance');
+      const requestedExchange = ((req.query.exchangeName as string) || '').trim().toLowerCase();
+
+      let userKeyInfo = requestedExchange ? await db.getExchangeKeys(userId, requestedExchange) : null;
+      if (!userKeyInfo) {
+        const allKeys = await db.getAllExchangeKeys(userId);
+        if (allKeys.length > 0) {
+          userKeyInfo = allKeys[0];
+        }
+      }
 
       if (!userKeyInfo) {
         res.status(400).json({
@@ -103,13 +119,21 @@ export class ExchangeController {
   static async getStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const userKeyInfo = await db.getExchangeKeys(userId, 'binance');
+      const requestedExchange = ((req.query.exchangeName as string) || '').trim().toLowerCase();
+
+      let userKeyInfo = requestedExchange ? await db.getExchangeKeys(userId, requestedExchange) : null;
+      if (!userKeyInfo) {
+        const allKeys = await db.getAllExchangeKeys(userId);
+        if (allKeys.length > 0) {
+          userKeyInfo = allKeys[0];
+        }
+      }
 
       if (!userKeyInfo) {
         res.json({
           success: true,
           data: {
-            exchangeName: 'Binance Spot',
+            exchangeName: requestedExchange || 'binance',
             isConnected: false,
             apiKeyMasked: 'لم يتم الربط بعد',
             permissions: [],
@@ -136,7 +160,6 @@ export class ExchangeController {
   static async getOpenPositions(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      // Trigger a position monitoring check
       await PaperTradingEngine.monitorOpenPositions(userId);
 
       const openTrades = await db.getOpenPaperTrades(userId);
