@@ -46,7 +46,8 @@ data class UserSettingsDto(
     val maxDailyTrades: Int = 5,
     val maxOpenPositions: Int = 3,
     val tradingMode: String = "AUTOMATED_AI", // "AUTOMATED_AI" or "MANUAL"
-    val selectedExchange: String = "binance", // "binance", "okx", "bybit"
+    val selectedExchange: String = "bybit", // "binance", "okx", "bybit"
+    val aiExperienceLevel: String = "MEDIUM", // "LOW", "MEDIUM", "HIGH"
     val isPaperTrading: Boolean = true,
     val stopLossRequired: Boolean = true
 )

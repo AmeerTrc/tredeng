@@ -63,7 +63,11 @@ fun TredeigNavGraph(
                 onNavigateToRisk = { navController.navigate(Screen.RiskSettings.route) },
                 onNavigateToPositions = { navController.navigate(Screen.OpenPositions.route) },
                 onNavigateToHistory = { navController.navigate(Screen.TradeHistory.route) },
-                onNavigateToAI = { navController.navigate(Screen.AIAssistant.route) }
+                onNavigateToAI = { navController.navigate(Screen.AIAssistant.route) },
+                onCoinSelect = { symbol ->
+                    marketViewModel.selectSymbolForChart(symbol)
+                    navController.navigate(Screen.Chart.route)
+                }
             )
         }
 
@@ -118,7 +122,8 @@ fun TredeigNavGraph(
                 isLoading = state.isChartLoading,
                 errorMessage = state.chartError,
                 onIntervalSelected = { interval -> marketViewModel.setIntervalForChart(interval) },
-                onRefresh = { marketViewModel.loadChartData(state.activeSymbol, state.selectedInterval, state.selectedExchange) }
+                onRefresh = { marketViewModel.loadChartData(state.activeSymbol, state.selectedInterval, state.selectedExchange) },
+                onBack = { navController.popBackStack() }
             )
         }
 

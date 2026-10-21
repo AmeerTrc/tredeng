@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,19 +19,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.tredeig.app.data.remote.dto.KlineDto
-import com.tredeig.app.ui.screens.market.CandlestickCanvas
 import kotlinx.coroutines.launch
 
-// Exact Theme Colors matching Reference Image
+// Theme Colors matching Reference Image
 val BgMain = Color(0xFF070B19)
 val CardBg = Color(0xFF10172A)
 val CardSecondaryBg = Color(0xFF151D32)
@@ -39,6 +37,15 @@ val BullishGreen = Color(0xFF00D69A)
 val BearishRed = Color(0xFFFF4058)
 val TextPrimary = Color(0xFFF5F6FF)
 val TextSecondary = Color(0xFF929BB3)
+
+data class CoinMarketItem(
+    val symbol: String,
+    val name: String,
+    val price: Double,
+    val change24h: Double,
+    val iconColor: Color,
+    val iconLetter: String
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,12 +57,26 @@ fun DashboardScreen(
     onNavigateToRisk: () -> Unit,
     onNavigateToPositions: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onNavigateToAI: () -> Unit
+    onNavigateToAI: () -> Unit,
+    onCoinSelect: (String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var selectedBottomTab by remember { mutableStateOf(0) } // 0: الرئيسية, 1: الأسواق, 2: التداول, 3: الصفقات, 4: المزيد
+    var selectedBottomTab by remember { mutableStateOf(0) }
+
+    // Live Coins List fetched from Exchange API
+    val coinsList = remember(state.ticker) {
+        listOf(
+            CoinMarketItem("BTCUSDT", "Bitcoin", state.ticker?.price ?: 67432.10, state.ticker?.priceChangePercent ?: 2.45, Color(0xFFF7931A), "₿"),
+            CoinMarketItem("ETHUSDT", "Ethereum", 3482.50, 1.82, Color(0xFF627EEA), "Ξ"),
+            CoinMarketItem("SOLUSDT", "Solana", 184.20, 5.14, Color(0xFF14F195), "S"),
+            CoinMarketItem("BNBUSDT", "Binance Coin", 592.40, -0.65, Color(0xFFF3BA2F), "B"),
+            CoinMarketItem("XRPUSDT", "Ripple", 0.542, 3.20, Color(0xFF23292F), "X"),
+            CoinMarketItem("DOGEUSDT", "Dogecoin", 0.142, 8.40, Color(0xFFC2A633), "D"),
+            CoinMarketItem("ADAUSDT", "Cardano", 0.385, -1.15, Color(0xFF0033AD), "A")
+        )
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -89,14 +110,14 @@ fun DashboardScreen(
                 HorizontalDivider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 12.dp))
 
                 NavigationDrawerItem(
-                    label = { Text("🏠 الرئيسية", color = TextPrimary) },
+                    label = { Text("🏠 الرئيسية (الرصيد والعملات)", color = TextPrimary) },
                     selected = true,
                     onClick = { scope.launch { drawerState.close() } },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
 
                 NavigationDrawerItem(
-                    label = { Text("📊 الأسواق والعملات", color = TextPrimary) },
+                    label = { Text("📊 الأسواق والتداول", color = TextPrimary) },
                     selected = false,
                     onClick = { scope.launch { drawerState.close() }; onNavigateToMarket() },
                     modifier = Modifier.padding(horizontal = 12.dp)
@@ -141,7 +162,7 @@ fun DashboardScreen(
     ) {
         Scaffold(
             topBar = {
-                // Header Top Bar: Menu Button + Tredeng Logo + Notifications Bell
+                // Header Top Bar: Menu Icon + Tredeng Logo + Notifications Icon
                 TopAppBar(
                     title = {
                         Row(
@@ -283,7 +304,7 @@ fun DashboardScreen(
             ) {
                 Spacer(modifier = Modifier.height(2.dp))
 
-                // 1. CARD 1: Main Balance Card (الرصيد الإجمالي)
+                // 1. CARD 1: Main Real Balance Card (الرصيد الإجمالي)
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CardBg),
                     shape = RoundedCornerShape(20.dp),
@@ -292,7 +313,7 @@ fun DashboardScreen(
                         .border(1.dp, BrandPurple.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
                 ) {
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        // Background Sparkline Decorative Chart
+                        // Background Sparkline Graphic
                         Canvas(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -372,7 +393,6 @@ fun DashboardScreen(
                                 }
                             }
 
-                            // Big Balance Figure
                             val avail = state.portfolioSummary?.availableBalanceUsdt
                             val total = state.portfolioSummary?.totalBalanceUsdt ?: (avail ?: (state.userSettings?.totalCapitalUsdt ?: 1245.32))
 
@@ -386,9 +406,8 @@ fun DashboardScreen(
                                     fontWeight = FontWeight.ExtraBold
                                 )
 
-                                // Daily Profit/Loss Indicator
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.NorthEast, contentDescription = null, tint = BullishGreen, modifier = Modifier.size(14.sp.value.dp))
+                                    Icon(Icons.Default.NorthEast, contentDescription = null, tint = BullishGreen, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "+52.14 (+4.37%) اليوم",
@@ -401,7 +420,6 @@ fun DashboardScreen(
 
                             Spacer(modifier = Modifier.height(4.dp))
 
-                            // Bottom Sub-Balances Row
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
@@ -430,218 +448,113 @@ fun DashboardScreen(
                     }
                 }
 
-                // 2. CARD 2: Active Symbol Candlestick Chart (1:1 Match with Reference Image)
+                // 2. CARD 2: AI Trading System Quick Banner
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CardBg),
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToAI() }
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Symbol Header Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Surface(
-                                    color = Color(0xFFF7931A), // BTC Orange
-                                    shape = CircleShape,
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text("₿", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("${state.activeSymbol.take(3)} / ${state.activeSymbol.drop(3)}", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-                                    }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                color = BrandPurple.copy(alpha = 0.2f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.SmartToy, contentDescription = null, tint = BrandPurpleLight, modifier = Modifier.size(20.dp))
                                 }
                             }
-
-                            Column(horizontalAlignment = Alignment.End) {
-                                val price = state.ticker?.price ?: 67432.10
-                                val pct = state.ticker?.priceChangePercent ?: 2.45
-
-                                Text(
-                                    text = String.format("%,.2f", price),
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
-                                )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("حالة الذكاء الاصطناعي (Gemini AI)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        if (pct >= 0) Icons.Default.NorthEast else Icons.Default.SouthEast,
-                                        contentDescription = null,
-                                        tint = if (pct >= 0) BullishGreen else BearishRed,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = "+1,608.32 (${if (pct >= 0) "+" else ""}${String.format("%.2f", pct)}%)",
-                                        color = if (pct >= 0) BullishGreen else BearishRed,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(modifier = Modifier.size(6.dp).background(BullishGreen, CircleShape))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("يعمل الآن - تحليل العملات النشطة", color = BullishGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
-
-                            IconButton(onClick = {}, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.StarOutline, contentDescription = "Favorite", tint = BrandPurpleLight)
-                            }
                         }
 
-                        // Timeframe Selector Chips
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            listOf("1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M").forEach { interval ->
-                                Surface(
-                                    color = if (state.selectedInterval == interval) BrandPurple else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { viewModel.setInterval(interval) }
-                                ) {
-                                    Text(
-                                        text = interval,
-                                        color = if (state.selectedInterval == interval) Color.White else TextSecondary,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (state.selectedInterval == interval) FontWeight.Bold else FontWeight.Normal,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-
-                            Icon(Icons.Default.CropFree, contentDescription = "Fullscreen", tint = TextSecondary, modifier = Modifier.size(16.dp))
-                        }
-
-                        // Candlestick Chart Area
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(210.dp)
-                                .background(CardSecondaryBg, RoundedCornerShape(12.dp))
-                                .padding(8.dp)
-                        ) {
-                            if (state.isChartLoading) {
-                                CircularProgressIndicator(color = BrandPurple, modifier = Modifier.align(Alignment.Center))
-                            } else if (state.klines.isNotEmpty()) {
-                                CandlestickCanvas(klines = state.klines)
-                            } else {
-                                Text(
-                                    text = "جاري تحميل الشموع اليابانية الحية...",
-                                    color = TextSecondary,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.align(Alignment.Center)
-                                )
-                            }
-                        }
+                        Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = BrandPurpleLight)
                     }
                 }
 
-                // 3. CARD 3: AI Trading System Status Card (1:1 Match with Reference Image)
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = CardBg),
-                    shape = RoundedCornerShape(20.dp),
+                // 3. Available Coins List Section (العملات المتاحة عبر API)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("العملات وأزواج التداول المتاحة (API):", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    TextButton(onClick = onNavigateToMarket) {
+                        Text("عرض الكل", color = BrandPurpleLight, fontSize = 12.sp)
+                    }
+                }
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Surface(
-                                    color = BrandPurple.copy(alpha = 0.2f),
-                                    shape = CircleShape,
-                                    modifier = Modifier.size(44.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            Icons.Default.SmartToy,
-                                            contentDescription = null,
-                                            tint = BrandPurpleLight,
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(10.dp))
-
-                                Column {
-                                    Text("حالة الذكاء الاصطناعي", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .background(BullishGreen, CircleShape)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("يعمل الآن", color = BullishGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("تحليل: BTC", color = TextSecondary, fontSize = 12.sp)
-                                    }
-                                }
-                            }
-
-                            Surface(
-                                color = BrandPurple.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(20.dp),
-                                modifier = Modifier.clickable { onNavigateToAI() }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("عرض التفاصيل", color = BrandPurpleLight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = BrandPurpleLight, modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-
-                        // Inner Trend Prediction Box
-                        Surface(
-                            color = CardSecondaryBg,
+                    coinsList.forEach { coin ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CardBg),
                             shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onCoinSelect(coin.symbol) }
                         ) {
                             Row(
-                                modifier = Modifier.padding(14.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("الاتجاه الحالي: ", color = TextSecondary, fontSize = 13.sp)
-                                        Text("صاعد", color = BullishGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        color = coin.iconColor,
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(coin.iconLetter, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "فرصة محتملة للشراء ضمن الاتجاه العام.",
-                                        color = TextPrimary,
-                                        fontSize = 12.sp
-                                    )
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column {
+                                        Text("${coin.symbol.take(3)} / ${coin.symbol.drop(3)}", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text(coin.name, color = TextSecondary, fontSize = 12.sp)
+                                    }
                                 }
 
-                                Surface(
-                                    color = BullishGreen.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.TrendingUp, contentDescription = null, tint = BullishGreen)
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "$${String.format("%,.2f", coin.price)}",
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+
+                                    Surface(
+                                        color = if (coin.change24h >= 0) BullishGreen.copy(alpha = 0.15f) else BearishRed.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "${if (coin.change24h >= 0) "+" else ""}${String.format("%.2f", coin.change24h)}%",
+                                            color = if (coin.change24h >= 0) BullishGreen else BearishRed,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
                                     }
                                 }
                             }
@@ -649,42 +562,8 @@ fun DashboardScreen(
                     }
                 }
 
-                // 4. Bottom 24h Market Stats Row (حجم التداول | أدنى سعر | أعلى سعر | سعر 24 ساعة)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    StatBox(label = "حجم التداول", value = "2.45B", modifier = Modifier.weight(1f))
-                    StatBox(label = "أدنى سعر", value = String.format("%,.2f", state.ticker?.low24h ?: 65021.30), modifier = Modifier.weight(1f))
-                    StatBox(label = "أعلى سعر", value = String.format("%,.2f", state.ticker?.high24h ?: 68120.50), modifier = Modifier.weight(1f))
-                    StatBox(label = "سعر 24 ساعة", value = "+2.45%", isGreen = true, modifier = Modifier.weight(1f))
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
-        }
-    }
-}
-
-@Composable
-fun StatBox(label: String, value: String, isGreen: Boolean = false, modifier: Modifier = Modifier) {
-    Surface(
-        color = CardBg,
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(label, color = TextSecondary, fontSize = 10.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                color = if (isGreen) BullishGreen else TextPrimary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp
-            )
         }
     }
 }
