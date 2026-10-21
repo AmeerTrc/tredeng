@@ -1,6 +1,6 @@
 import axios from 'axios';
 import crypto from 'crypto';
-import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Balance } from './exchangeAdapter';
+import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Balance, Kline } from './exchangeAdapter';
 
 const BYBIT_ENDPOINTS = [
   'https://api.bybit.com',
@@ -54,7 +54,6 @@ export class BybitAdapter implements ExchangeAdapter {
     const cleanSecret = apiSecret.trim();
 
     try {
-      // Primary Check: Try user API key info endpoint
       const headers = this.getAuthHeaders(cleanKey, cleanSecret, '');
       const response = await this.fetchWithFallback('/v5/user/get-api-key-information', { headers });
 
@@ -75,7 +74,6 @@ export class BybitAdapter implements ExchangeAdapter {
         };
       }
 
-      // Secondary Check 1: Try UNIFIED wallet balance
       const unifiedQuery = 'accountType=UNIFIED';
       const unifiedHeaders = this.getAuthHeaders(cleanKey, cleanSecret, unifiedQuery);
       const unifiedResponse = await this.fetchWithFallback(`/v5/account/wallet-balance?${unifiedQuery}`, { headers: unifiedHeaders });
@@ -91,7 +89,6 @@ export class BybitAdapter implements ExchangeAdapter {
         };
       }
 
-      // Secondary Check 2: Try Classic SPOT wallet balance
       const spotQuery = 'accountType=SPOT';
       const spotHeaders = this.getAuthHeaders(cleanKey, cleanSecret, spotQuery);
       const spotResponse = await this.fetchWithFallback(`/v5/account/wallet-balance?${spotQuery}`, { headers: spotHeaders });
@@ -217,6 +214,33 @@ export class BybitAdapter implements ExchangeAdapter {
       return symbols;
     } catch (error: any) {
       throw new Error(`فشل جلب أزواج التداول من Bybit`);
+    }
+  }
+
+  async getKlines(symbol: string = 'BTCUSDT', interval: string = '15m', limit: number = 100): Promise<Kline[]> {
+    const intervalMap: Record<string, string> = {
+      '1m': '1', '5m': '5', '15m': '15', '30m': '30',
+      '1h': '60', '4h': '240', '1d': 'D', '1w': 'W', '1M': 'M'
+    };
+    const bybitInterval = intervalMap[interval] || '15';
+
+    try {
+      const response = await this.fetchWithFallback(`/v5/market/kline?category=spot&symbol=${symbol}&interval=${bybitInterval}&limit=${limit}`);
+      const rawList = response.data?.result?.list || [];
+
+      // Bybit returns newest candles FIRST -> reverse to chronological order
+      const klines: Kline[] = rawList.reverse().map((item: any) => ({
+        openTime: parseInt(item[0], 10),
+        open: parseFloat(item[1]),
+        high: parseFloat(item[2]),
+        low: parseFloat(item[3]),
+        close: parseFloat(item[4]),
+        volume: parseFloat(item[5])
+      }));
+
+      return klines;
+    } catch (error: any) {
+      throw new Error(`فشل جلب الشموع اليابانية لزوج ${symbol} من Bybit: ${error.message}`);
     }
   }
 }

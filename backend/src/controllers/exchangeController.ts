@@ -77,6 +77,86 @@ export class ExchangeController {
     }
   }
 
+  static async deleteKeys(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const exchangeName = ((req.params.exchangeName as string) || '').trim().toLowerCase();
+
+      if (!exchangeName) {
+        res.status(400).json({ success: false, data: null, message: 'اسم المنصة مطلوب' });
+        return;
+      }
+
+      await db.deleteExchangeKeys(userId, exchangeName);
+      res.json({
+        success: true,
+        data: null,
+        message: `تم حذف مفاتيح منصة ${exchangeName.toUpperCase()} بنجاح من قاعدة البيانات المشفرة`
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
+  static async getAllKeysStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.userId!;
+      const allKeys = await db.getAllExchangeKeys(userId);
+
+      const statuses = [];
+      const supportedExchanges = ['binance', 'bybit', 'okx'];
+
+      for (const exName of supportedExchanges) {
+        const savedKey = allKeys.find(k => k.exchangeName.toLowerCase() === exName);
+        if (savedKey) {
+          try {
+            const apiKey = CryptoService.decrypt(savedKey.apiKeyEncrypted);
+            const apiSecret = CryptoService.decrypt(savedKey.apiSecretEncrypted);
+            const adapter = getAdapter(exName);
+            const liveStatus = await adapter.validateKeys(apiKey, apiSecret);
+            statuses.push({
+              exchangeName: exName,
+              isConnected: liveStatus.isConnected,
+              apiKeyMasked: `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`,
+              permissions: liveStatus.permissions,
+              canTradeSpot: liveStatus.canTradeSpot,
+              canWithdraw: liveStatus.canWithdraw,
+              updatedAt: savedKey.updatedAt
+            });
+          } catch (e: any) {
+            statuses.push({
+              exchangeName: exName,
+              isConnected: false,
+              apiKeyMasked: 'مفتاح مضاف',
+              permissions: [],
+              canTradeSpot: true,
+              canWithdraw: false,
+              updatedAt: savedKey.updatedAt
+            });
+          }
+        } else {
+          statuses.push({
+            exchangeName: exName,
+            isConnected: false,
+            apiKeyMasked: 'غير مرتبط',
+            permissions: [],
+            canTradeSpot: false,
+            canWithdraw: false,
+            updatedAt: null
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        data: statuses,
+        message: 'تم جلب حالة جميع المنصات بنجاح'
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
   static async getBalance(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;

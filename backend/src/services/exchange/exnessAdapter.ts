@@ -1,4 +1,4 @@
-import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker } from './exchangeAdapter';
+import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Kline } from './exchangeAdapter';
 
 export class ExnessAdapter implements ExchangeAdapter {
   getName(): string {
@@ -41,5 +41,26 @@ export class ExnessAdapter implements ExchangeAdapter {
 
   async getAvailableSymbols(): Promise<string[]> {
     return ['XAUUSD', 'XAGUSD', 'EURUSD', 'GBPUSD'];
+  }
+
+  async getKlines(symbol: string = 'XAUUSD', interval: string = '15m', limit: number = 100): Promise<Kline[]> {
+    const basePrice = 2648.50;
+    const now = Date.now();
+    const intervalMs = 15 * 60 * 1000;
+    const klines: Kline[] = [];
+
+    for (let i = limit; i >= 0; i--) {
+      const openTime = now - (i * intervalMs);
+      const varFactor = Math.sin(i / 3) * 5;
+      klines.push({
+        openTime,
+        open: basePrice + varFactor,
+        high: basePrice + varFactor + 3,
+        low: basePrice + varFactor - 3,
+        close: basePrice + varFactor + 1,
+        volume: 5000 + (i * 10)
+      });
+    }
+    return klines;
   }
 }

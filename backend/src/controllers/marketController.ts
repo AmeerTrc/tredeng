@@ -16,10 +16,10 @@ export class MarketController {
       const rawSymbol = Array.isArray(req.params.symbol) ? req.params.symbol[0] : req.params.symbol;
       const symbol = (rawSymbol || 'BTCUSDT').toUpperCase();
 
-      const exchangeQuery = (req.query.exchange as string || 'binance').toLowerCase();
-      let adapter: any = new BinanceAdapter();
+      const exchangeQuery = (req.query.exchange as string || 'bybit').toLowerCase();
+      let adapter: any = new BybitAdapter();
+      if (exchangeQuery === 'binance') adapter = new BinanceAdapter();
       if (exchangeQuery === 'okx') adapter = new OkxAdapter();
-      if (exchangeQuery === 'bybit') adapter = new BybitAdapter();
       if (symbol.includes('XAU')) adapter = new ExnessAdapter();
 
       const ticker = await adapter.getTicker(symbol);
@@ -34,14 +34,38 @@ export class MarketController {
     }
   }
 
+  static async getKlines(req: Request, res: Response): Promise<void> {
+    try {
+      const rawSymbol = Array.isArray(req.params.symbol) ? req.params.symbol[0] : req.params.symbol;
+      const symbol = (rawSymbol || 'BTCUSDT').toUpperCase();
+      const interval = (req.query.interval as string || '15m').toLowerCase();
+      const exchangeQuery = (req.query.exchange as string || 'bybit').toLowerCase();
+
+      let adapter: any = new BybitAdapter();
+      if (exchangeQuery === 'binance') adapter = new BinanceAdapter();
+      if (exchangeQuery === 'okx') adapter = new OkxAdapter();
+      if (symbol.includes('XAU')) adapter = new ExnessAdapter();
+
+      const klines = await adapter.getKlines(symbol, interval, 100);
+
+      res.json({
+        success: true,
+        data: klines,
+        message: `تم جلب ${klines.length} شمعة يابانية لزوج ${symbol} بالفترة ${interval}`
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, data: null, message: error.message });
+    }
+  }
+
   static async getAvailableSymbols(req: Request, res: Response): Promise<void> {
     try {
-      const exchangeNameStr = (req.params.exchangeName as string) || 'binance';
+      const exchangeNameStr = (req.params.exchangeName as string) || 'bybit';
       const exchangeName = exchangeNameStr.toLowerCase();
 
-      let adapter: any = new BinanceAdapter();
+      let adapter: any = new BybitAdapter();
+      if (exchangeName === 'binance') adapter = new BinanceAdapter();
       if (exchangeName === 'okx') adapter = new OkxAdapter();
-      if (exchangeName === 'bybit') adapter = new BybitAdapter();
       if (exchangeName === 'exness') adapter = new ExnessAdapter();
 
       const symbols = await adapter.getAvailableSymbols();
@@ -89,7 +113,7 @@ export class MarketController {
   static async getSelectedCoins(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const exchangeName = (req.params.exchangeName as string) || 'binance';
+      const exchangeName = (req.params.exchangeName as string) || 'bybit';
       const coins = await db.getSelectedCoins(userId, exchangeName);
       res.json({ success: true, data: coins, message: 'Selected coins loaded' });
     } catch (error: any) {
@@ -100,7 +124,7 @@ export class MarketController {
   static async saveSelectedCoin(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.userId!;
-      const exchangeName = (req.params.exchangeName as string) || 'binance';
+      const exchangeName = (req.params.exchangeName as string) || 'bybit';
       const { symbol, isActive } = req.body;
 
       if (!symbol) {

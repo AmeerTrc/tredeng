@@ -1,6 +1,6 @@
 import axios from 'axios';
 import crypto from 'crypto';
-import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Balance } from './exchangeAdapter';
+import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Balance, Kline } from './exchangeAdapter';
 import { ENV } from '../../config/env';
 
 const BINANCE_AUTH_ENDPOINTS = [
@@ -36,7 +36,6 @@ export class BinanceAdapter implements ExchangeAdapter {
         return response;
       } catch (err: any) {
         lastError = err;
-        // If it's a 4xx error from Binance (e.g. invalid key or IP), don't keep retrying identical endpoints
         if (err.response && (err.response.status === 400 || err.response.status === 401 || err.response.status === 403)) {
           throw err;
         }
@@ -174,6 +173,26 @@ export class BinanceAdapter implements ExchangeAdapter {
       return symbols;
     } catch (error: any) {
       throw new Error(`فشل جلب أزواج التداول من Binance: ${error.message}`);
+    }
+  }
+
+  async getKlines(symbol: string = 'BTCUSDT', interval: string = '15m', limit: number = 100): Promise<Kline[]> {
+    try {
+      const response = await this.fetchWithFallback(`/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+      const rawList = response.data || [];
+
+      const klines: Kline[] = rawList.map((item: any) => ({
+        openTime: item[0],
+        open: parseFloat(item[1]),
+        high: parseFloat(item[2]),
+        low: parseFloat(item[3]),
+        close: parseFloat(item[4]),
+        volume: parseFloat(item[5])
+      }));
+
+      return klines;
+    } catch (error: any) {
+      throw new Error(`فشل جلب الشموع اليابانية لزوج ${symbol} من Binance: ${error.message}`);
     }
   }
 }

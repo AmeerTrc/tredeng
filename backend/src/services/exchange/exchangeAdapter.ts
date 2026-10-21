@@ -22,6 +22,15 @@ export interface Ticker {
   timestamp: number;
 }
 
+export interface Kline {
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface ExchangeStatus {
   exchangeName: string;
   isConnected: boolean;
@@ -38,4 +47,5 @@ export interface ExchangeAdapter {
   getPortfolio(apiKey: string, apiSecret: string): Promise<PortfolioSummary>;
   getTicker(symbol: string): Promise<Ticker>;
   getAvailableSymbols(): Promise<string[]>;
+  getKlines(symbol: string, interval: string, limit?: number): Promise<Kline[]>;
 }

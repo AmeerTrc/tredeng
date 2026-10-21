@@ -5,6 +5,7 @@ import { authMiddleware } from '../middleware/authMiddleware';
 const router = Router();
 
 router.get('/ticker/:symbol?', MarketController.getTicker);
+router.get('/klines/:symbol?', MarketController.getKlines);
 router.get('/symbols/:exchangeName', authMiddleware as any, MarketController.getAvailableSymbols as any);
 router.get('/ai-test/:symbol?', MarketController.testGeminiAnalysis as any);
 
