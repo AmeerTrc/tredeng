@@ -47,7 +47,7 @@ fun ExchangeConnectionScreen(
     if (keyToDelete != null) {
         AlertDialog(
             onDismissRequest = { keyToDelete = null },
-            title = { Text("تأكيد حذف المفتاح المشفر", fontWeight = FontWeight.Bold) },
+            title = { Text("تأكيد حذف وفصل المفتاح", fontWeight = FontWeight.Bold) },
             text = { Text("هل أنت تأكد من رغبتك في حذف مفاتيح منصة ${keyToDelete?.uppercase()} من خادم Tredeng المشفر؟\n\nتنبيه: حذف المفتاح من التطبيق لا يلغيه من المنصة نفسها. لإلغائه تماماً اذهب إلى إعدادات API في المنصة.") },
             confirmButton = {
                 Button(
@@ -57,7 +57,7 @@ fun ExchangeConnectionScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
                 ) {
-                    Text("حذف نهائي")
+                    Text("فصل وحذف المفتاح")
                 }
             },
             dismissButton = {
@@ -85,6 +85,80 @@ fun ExchangeConnectionScreen(
             )
         }
 
+        // List of Connected Exchanges & Their Status First
+        item {
+            Text("المفاتيح والمنصات المرتبطة بالحساب:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+
+        when (val statuses = allStatusesState) {
+            is Resource.Loading -> {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = PrimaryGold)
+                    }
+                }
+            }
+            is Resource.Success -> {
+                val list = statuses.data ?: emptyList()
+                items(list) { ex ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardBackground),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(ex.exchangeName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                                    Text("المفتاح: ${ex.apiKeyMasked}", fontSize = 12.sp, color = TextSecondary)
+                                }
+
+                                Surface(
+                                    color = if (ex.isConnected) AccentGreen.copy(alpha = 0.2f) else AccentRed.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (ex.isConnected) "نشط ومحفوظ" else "غير مرتبط",
+                                        color = if (ex.isConnected) AccentGreen else TextSecondary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+
+                            if (ex.isConnected) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { keyToDelete = ex.exchangeName },
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentRed),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("فصل وإلغاء المفتاح", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else -> {}
+        }
+
         // Add / Update Keys Form Card
         item {
             Card(
@@ -96,7 +170,7 @@ fun ExchangeConnectionScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("إضافة / تحديث مفتاح منصة:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("إضافة / تعديل مفتاح منصة جديد:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -165,7 +239,7 @@ fun ExchangeConnectionScreen(
                     }
 
                     if (saveState is Resource.Success) {
-                        Text("تم التشفير والحفظ بنجاح بـ AES-256 في قاعدة البيانات!", color = AccentGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("تم التشفير والحفظ بنجاح بـ AES-256 وتفعيل المفتاح!", color = AccentGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Button(
@@ -178,72 +252,11 @@ fun ExchangeConnectionScreen(
                         if (saveState is Resource.Loading) {
                             CircularProgressIndicator(color = DarkBackground, modifier = Modifier.size(24.dp))
                         } else {
-                            Text("تشفير وحفظ المفتاح الموحد", color = DarkBackground, fontWeight = FontWeight.Bold)
+                            Text("تشفير وتفعيل المفتاح الموحد", color = DarkBackground, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
-        }
-
-        // List of Connected Exchanges & Their Real Status
-        item {
-            Text("حالة الاتصال والمنصات المسجلة:", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
-
-        when (val statuses = allStatusesState) {
-            is Resource.Loading -> {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = PrimaryGold)
-                    }
-                }
-            }
-            is Resource.Success -> {
-                val list = statuses.data ?: emptyList()
-                items(list) { ex ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CardBackground),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(ex.exchangeName.uppercase(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                                Text("المفتاح: ${ex.apiKeyMasked}", fontSize = 12.sp, color = TextSecondary)
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        color = if (ex.isConnected) AccentGreen.copy(alpha = 0.2f) else AccentRed.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text(
-                                            text = if (ex.isConnected) "متصل بنجاح" else "غير مرتبط",
-                                            color = if (ex.isConnected) AccentGreen else AccentRed,
-                                            fontSize = 11.sp,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            Row {
-                                IconButton(onClick = { viewModel.loadAllStatuses() }) {
-                                    Icon(Icons.Default.Refresh, contentDescription = "Test Connection", tint = PrimaryGold)
-                                }
-                                if (ex.apiKeyMasked != "غير مرتبط") {
-                                    IconButton(onClick = { keyToDelete = ex.exchangeName }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete Keys", tint = AccentRed)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else -> {}
         }
 
         item {
