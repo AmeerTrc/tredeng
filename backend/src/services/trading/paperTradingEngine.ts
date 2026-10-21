@@ -30,10 +30,9 @@ export class PaperTradingEngine {
     // 1. Monitor existing open positions for SL/TP triggers
     await this.monitorOpenPositions(userId);
 
-    const selectedCoins = await db.getSelectedCoins(userId, targetExchange);
+    let selectedCoins = await db.getSelectedCoins(userId, targetExchange);
     if (selectedCoins.length === 0) {
-      console.log(`[Paper Trading] No coins selected for user ${userId} on ${targetExchange}.`);
-      return;
+      selectedCoins = [{ userId, exchangeName: targetExchange, symbol: 'BTCUSDT', isActive: true }];
     }
 
     const openTrades = await db.getOpenPaperTrades(userId);

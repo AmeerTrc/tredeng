@@ -2,31 +2,15 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { ExchangeAdapter, ExchangeStatus, PortfolioSummary, Ticker, Balance } from './exchangeAdapter';
 
-const BYBIT_BASE_URL = 'https://api.bybit.com';
+const BYBIT_ENDPOINTS = [
+  'https://api.bybit.com',
+  'https://api.bytick.com',
+  'https://api.bybit.nl'
+];
 
 export class BybitAdapter implements ExchangeAdapter {
   getName(): string {
     return 'bybit';
-  }
-
-  private static timeOffset: number = 0;
-  private static lastTimeSync: number = 0;
-
-  private async syncTime(): Promise<number> {
-    const now = Date.now();
-    if (now - BybitAdapter.lastTimeSync > 60000) {
-      try {
-        const res = await axios.get(`${BYBIT_BASE_URL}/v5/market/time`, { timeout: 3000 });
-        if (res.data?.time) {
-          const bybitTime = parseInt(res.data.time);
-          BybitAdapter.timeOffset = bybitTime - Date.now();
-          BybitAdapter.lastTimeSync = now;
-        }
-      } catch (e) {
-        // Fallback to local time if time endpoint unreachable
-      }
-    }
-    return Date.now() + BybitAdapter.timeOffset;
   }
 
   private generateSignature(timestamp: number, apiKey: string, recvWindow: number, queryString: string, apiSecret: string): string {
@@ -37,9 +21,9 @@ export class BybitAdapter implements ExchangeAdapter {
       .digest('hex');
   }
 
-  private async getAuthHeaders(apiKey: string, apiSecret: string, queryString: string = '') {
-    const timestamp = await this.syncTime();
-    const recvWindow = 20000;
+  private getAuthHeaders(apiKey: string, apiSecret: string, queryString: string = '') {
+    const timestamp = Date.now();
+    const recvWindow = 5000; // Bybit V5 strict limit is 5000 ms
     const signature = this.generateSignature(timestamp, apiKey, recvWindow, queryString, apiSecret);
 
     return {
@@ -47,24 +31,32 @@ export class BybitAdapter implements ExchangeAdapter {
       'X-BAPI-TIMESTAMP': timestamp.toString(),
       'X-BAPI-RECV-WINDOW': recvWindow.toString(),
       'X-BAPI-SIGN': signature,
-      'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Tredeig/1.0'
+      'Content-Type': 'application/json'
     };
+  }
+
+  private async fetchWithFallback(path: string, config: any = {}): Promise<any> {
+    let lastError = null;
+    for (const baseUrl of BYBIT_ENDPOINTS) {
+      try {
+        const url = `${baseUrl}${path}`;
+        const response = await axios.get(url, { ...config, timeout: 8000 });
+        return response;
+      } catch (err: any) {
+        lastError = err;
+      }
+    }
+    throw lastError;
   }
 
   async validateKeys(apiKey: string, apiSecret: string): Promise<ExchangeStatus> {
     const cleanKey = apiKey.trim();
     const cleanSecret = apiSecret.trim();
 
-    let lastErrorMsg = 'فشل المصادقة مع Bybit';
-
-    // 1. Primary Check: Try user API key info endpoint (/v5/user/query-api)
     try {
-      const headers = await this.getAuthHeaders(cleanKey, cleanSecret, '');
-      const response = await axios.get(`${BYBIT_BASE_URL}/v5/user/query-api`, {
-        headers,
-        timeout: 8000
-      });
+      // Primary Check: Try user API key info endpoint
+      const headers = this.getAuthHeaders(cleanKey, cleanSecret, '');
+      const response = await this.fetchWithFallback('/v5/user/get-api-key-information', { headers });
 
       if (response.data && response.data.retCode === 0) {
         const info = response.data.result || {};
@@ -81,25 +73,12 @@ export class BybitAdapter implements ExchangeAdapter {
           canTradeSpot: !isReadOnly,
           canWithdraw: canWithdraw
         };
-      } else if (response.data?.retMsg) {
-        lastErrorMsg = response.data.retMsg;
       }
-    } catch (err: any) {
-      if (err.response?.data?.retMsg) {
-        lastErrorMsg = err.response.data.retMsg;
-      } else {
-        lastErrorMsg = err.message;
-      }
-    }
 
-    // 2. Secondary Check 1: Try UNIFIED wallet balance
-    try {
+      // Secondary Check 1: Try UNIFIED wallet balance
       const unifiedQuery = 'accountType=UNIFIED';
-      const unifiedHeaders = await this.getAuthHeaders(cleanKey, cleanSecret, unifiedQuery);
-      const unifiedResponse = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${unifiedQuery}`, {
-        headers: unifiedHeaders,
-        timeout: 8000
-      });
+      const unifiedHeaders = this.getAuthHeaders(cleanKey, cleanSecret, unifiedQuery);
+      const unifiedResponse = await this.fetchWithFallback(`/v5/account/wallet-balance?${unifiedQuery}`, { headers: unifiedHeaders });
 
       if (unifiedResponse.data && unifiedResponse.data.retCode === 0) {
         return {
@@ -110,23 +89,12 @@ export class BybitAdapter implements ExchangeAdapter {
           canTradeSpot: true,
           canWithdraw: false
         };
-      } else if (unifiedResponse.data?.retMsg) {
-        lastErrorMsg = unifiedResponse.data.retMsg;
       }
-    } catch (err: any) {
-      if (err.response?.data?.retMsg) {
-        lastErrorMsg = err.response.data.retMsg;
-      }
-    }
 
-    // 3. Secondary Check 2: Try Classic SPOT wallet balance
-    try {
+      // Secondary Check 2: Try Classic SPOT wallet balance
       const spotQuery = 'accountType=SPOT';
-      const spotHeaders = await this.getAuthHeaders(cleanKey, cleanSecret, spotQuery);
-      const spotResponse = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${spotQuery}`, {
-        headers: spotHeaders,
-        timeout: 8000
-      });
+      const spotHeaders = this.getAuthHeaders(cleanKey, cleanSecret, spotQuery);
+      const spotResponse = await this.fetchWithFallback(`/v5/account/wallet-balance?${spotQuery}`, { headers: spotHeaders });
 
       if (spotResponse.data && spotResponse.data.retCode === 0) {
         return {
@@ -137,24 +105,32 @@ export class BybitAdapter implements ExchangeAdapter {
           canTradeSpot: true,
           canWithdraw: false
         };
-      } else if (spotResponse.data?.retMsg) {
-        lastErrorMsg = spotResponse.data.retMsg;
       }
-    } catch (err: any) {
-      if (err.response?.data?.retMsg) {
-        lastErrorMsg = err.response.data.retMsg;
-      }
-    }
 
-    return {
-      exchangeName: 'Bybit Spot',
-      isConnected: false,
-      apiKeyMasked: 'INVALID',
-      permissions: [],
-      canTradeSpot: false,
-      canWithdraw: false,
-      errorMessage: `Bybit: ${lastErrorMsg}`
-    };
+      const errMsg = response.data?.retMsg || unifiedResponse.data?.retMsg || spotResponse.data?.retMsg || 'فشل المصادقة مع Bybit';
+      return {
+        exchangeName: 'Bybit Spot',
+        isConnected: false,
+        apiKeyMasked: 'INVALID',
+        permissions: [],
+        canTradeSpot: false,
+        canWithdraw: false,
+        errorMessage: `Bybit: ${errMsg}`
+      };
+
+    } catch (error: any) {
+      const msg = error.response?.data?.retMsg || error.message || 'خطأ اتصال بالشبكة';
+      console.error('Bybit validation exception:', msg);
+      return {
+        exchangeName: 'Bybit Spot',
+        isConnected: false,
+        apiKeyMasked: 'INVALID',
+        permissions: [],
+        canTradeSpot: false,
+        canWithdraw: false,
+        errorMessage: `Bybit: ${msg}`
+      };
+    }
   }
 
   async getPortfolio(apiKey: string, apiSecret: string): Promise<PortfolioSummary> {
@@ -163,20 +139,14 @@ export class BybitAdapter implements ExchangeAdapter {
 
     try {
       let queryString = 'accountType=UNIFIED';
-      let headers = await this.getAuthHeaders(cleanKey, cleanSecret, queryString);
+      let headers = this.getAuthHeaders(cleanKey, cleanSecret, queryString);
 
-      let response = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${queryString}`, {
-        headers,
-        timeout: 8000
-      });
+      let response = await this.fetchWithFallback(`/v5/account/wallet-balance?${queryString}`, { headers });
 
-      if (!response.data || response.data.retCode !== 0) {
+      if (response.data.retCode !== 0) {
         queryString = 'accountType=SPOT';
-        headers = await this.getAuthHeaders(cleanKey, cleanSecret, queryString);
-        response = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${queryString}`, {
-          headers,
-          timeout: 8000
-        });
+        headers = this.getAuthHeaders(cleanKey, cleanSecret, queryString);
+        response = await this.fetchWithFallback(`/v5/account/wallet-balance?${queryString}`, { headers });
       }
 
       if (response.data.retCode !== 0) {
@@ -223,9 +193,7 @@ export class BybitAdapter implements ExchangeAdapter {
 
   async getTicker(symbol: string = 'BTCUSDT'): Promise<Ticker> {
     try {
-      const response = await axios.get(`${BYBIT_BASE_URL}/v5/market/tickers?category=spot&symbol=${symbol}`, {
-        timeout: 5000
-      });
+      const response = await this.fetchWithFallback(`/v5/market/tickers?category=spot&symbol=${symbol}`);
 
       const data = response.data.result.list[0];
       return {
@@ -244,9 +212,7 @@ export class BybitAdapter implements ExchangeAdapter {
 
   async getAvailableSymbols(): Promise<string[]> {
     try {
-      const response = await axios.get(`${BYBIT_BASE_URL}/v5/market/instruments-info?category=spot`, {
-        timeout: 8000
-      });
+      const response = await this.fetchWithFallback(`/v5/market/instruments-info?category=spot`);
       const symbols = response.data.result.list.map((s: any) => s.symbol);
       return symbols;
     } catch (error: any) {

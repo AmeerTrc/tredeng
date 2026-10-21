@@ -239,6 +239,14 @@ export class DatabaseService {
     return row as UserRecord || null;
   }
 
+  async getAllUserIds(): Promise<string[]> {
+    if (this.isFallback) {
+      return Object.keys(this.memoryDb.users);
+    }
+    const rows = await this.db?.all('SELECT id FROM users');
+    return (rows || []).map((r: any) => r.id);
+  }
+
   async createUser(email: string, passwordHash: string): Promise<UserRecord> {
     const id = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const normalizedEmail = email.trim().toLowerCase();

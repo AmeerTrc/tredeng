@@ -35,7 +35,15 @@ class ExchangeRepositoryImpl(private val encryptedStorage: EncryptedStorage) {
                     )
                 )
             } else {
-                Resource.Error(response.body()?.message ?: "فشل حفظ مفاتيح API")
+                val errorMsg = try {
+                    val rawJson = response.errorBody()?.string()
+                    if (!rawJson.isNullOrBlank()) {
+                        org.json.JSONObject(rawJson).optString("message", null)
+                    } else null
+                } catch (_: Exception) {
+                    null
+                }
+                Resource.Error(errorMsg ?: response.body()?.message ?: "فشل حفظ مفاتيح API")
             }
         } catch (e: Exception) {
             Resource.Error("خطأ في الشبكة: ${e.localizedMessage}")
