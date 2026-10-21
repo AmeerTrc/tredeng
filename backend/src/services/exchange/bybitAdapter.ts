@@ -60,15 +60,15 @@ export class BybitAdapter implements ExchangeAdapter {
         };
       }
 
-      // Secondary Check: If get-api-key-information fails, verify via wallet-balance endpoint
-      const queryString = 'accountType=UNIFIED';
-      const walletHeaders = this.getAuthHeaders(cleanKey, cleanSecret, queryString);
-      const walletResponse = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${queryString}`, {
-        headers: walletHeaders,
+      // Secondary Check 1: Try UNIFIED wallet balance
+      const unifiedQuery = 'accountType=UNIFIED';
+      const unifiedHeaders = this.getAuthHeaders(cleanKey, cleanSecret, unifiedQuery);
+      const unifiedResponse = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${unifiedQuery}`, {
+        headers: unifiedHeaders,
         timeout: 8000
       });
 
-      if (walletResponse.data && walletResponse.data.retCode === 0) {
+      if (unifiedResponse.data && unifiedResponse.data.retCode === 0) {
         return {
           exchangeName: 'Bybit Spot',
           isConnected: true,
@@ -79,7 +79,26 @@ export class BybitAdapter implements ExchangeAdapter {
         };
       }
 
-      const errMsg = response.data?.retMsg || walletResponse.data?.retMsg || 'فشل المصادقة مع Bybit';
+      // Secondary Check 2: Try Classic SPOT wallet balance
+      const spotQuery = 'accountType=SPOT';
+      const spotHeaders = this.getAuthHeaders(cleanKey, cleanSecret, spotQuery);
+      const spotResponse = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${spotQuery}`, {
+        headers: spotHeaders,
+        timeout: 8000
+      });
+
+      if (spotResponse.data && spotResponse.data.retCode === 0) {
+        return {
+          exchangeName: 'Bybit Spot',
+          isConnected: true,
+          apiKeyMasked: `${cleanKey.substring(0, 4)}...${cleanKey.substring(cleanKey.length - 4)}`,
+          permissions: ['SPOT'],
+          canTradeSpot: true,
+          canWithdraw: false
+        };
+      }
+
+      const errMsg = response.data?.retMsg || unifiedResponse.data?.retMsg || spotResponse.data?.retMsg || 'فشل المصادقة مع Bybit';
       return {
         exchangeName: 'Bybit Spot',
         isConnected: false,
@@ -110,13 +129,24 @@ export class BybitAdapter implements ExchangeAdapter {
     const cleanSecret = apiSecret.trim();
 
     try {
-      const queryString = 'accountType=UNIFIED';
-      const headers = this.getAuthHeaders(cleanKey, cleanSecret, queryString);
+      // Try UNIFIED account balance first
+      let queryString = 'accountType=UNIFIED';
+      let headers = this.getAuthHeaders(cleanKey, cleanSecret, queryString);
 
-      const response = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${queryString}`, {
+      let response = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${queryString}`, {
         headers,
         timeout: 8000
       });
+
+      // Fallback to SPOT if UNIFIED fails
+      if (response.data.retCode !== 0) {
+        queryString = 'accountType=SPOT';
+        headers = this.getAuthHeaders(cleanKey, cleanSecret, queryString);
+        response = await axios.get(`${BYBIT_BASE_URL}/v5/account/wallet-balance?${queryString}`, {
+          headers,
+          timeout: 8000
+        });
+      }
 
       if (response.data.retCode !== 0) {
         throw new Error(`Bybit API Error: ${response.data.retMsg}`);
